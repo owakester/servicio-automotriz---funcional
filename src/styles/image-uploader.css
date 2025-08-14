@@ -1,0 +1,79 @@
+/* Estilos adicionales para el componente ImageUploader */
+
+.image-uploader {
+  /* Animaciones para hover en imágenes */
+  .image-container:hover .image-overlay {
+    opacity: 1;
+  }
+
+  .image-container .image-overlay {
+    transition: opacity 0.2s ease-in-out;
+  }
+
+  /* Efectos de carga */
+  .uploading {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .uploading::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    animation: loading 1.5s infinite;
+  }
+
+  @keyframes loading {
+    0% { left: -100%; }
+    100% { left: 100%; }
+  }
+
+  /* Efectos de drag and drop (para futuras mejoras) */
+  .drag-over {
+    border-color: #3b82f6;
+    background-color: #eff6ff;
+  }
+
+  /* Estilos para vista previa */
+  .preview-image {
+    max-width: 100%;
+    max-height: 200px;
+    object-fit: contain;
+  }
+
+  /* Responsive para móviles */
+  @media (max-width: 640px) {
+    .image-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+}
+
+/* Estilos para el modal de imagen completa */
+.image-modal {
+  backdrop-filter: blur(5px);
+}
+
+.image-modal img {
+  max-width: 90vw;
+  max-height: 90vh;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+/* Animaciones suaves para botones */
+.btn-upload {
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-upload:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-upload:active {
+  transform: translateY(0);
+}

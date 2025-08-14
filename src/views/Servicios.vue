@@ -1,0 +1,875 @@
+<template>
+  <div class="space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+      <h1 class="text-3xl font-bold text-gray-900">Servicios</h1>
+      <button
+        @click="mostrarFormulario = true"
+        class="btn-primary flex items-center"
+      >
+        <Plus class="h-4 w-4 mr-2" />
+        Nuevo Servicio
+      </button>
+    </div>
+
+    <!-- Filtros con mejoras de búsqueda -->
+    <div class="card">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="relative">
+          <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <input
+            v-model="filtroTexto"
+            type="text"
+            placeholder="Buscar por tipo de servicio..."
+            class="input-field pl-10"
+            aria-label="Buscar servicios"
+          />
+        </div>
+        <div>
+          <select v-model="filtroVehiculo" class="input-field">
+            <option value="">Todos los vehículos</option>
+            <option v-for="vehiculo in vehiculos" :key="vehiculo.id" :value="vehiculo.id">
+              {{ vehiculo.marca }} {{ vehiculo.modelo }} - {{ vehiculo.patente }}
+            </option>
+          </select>
+        </div>
+        <div>
+          <select v-model="filtroCliente" class="input-field">
+            <option value="">Todos los clientes</option>
+            <option v-for="cliente in clientes" :key="cliente.id" :value="cliente.id">
+              {{ cliente.nombre }}
+            </option>
+          </select>
+        </div>
+        <div>
+          <select v-model="filtroEstado" class="input-field">
+            <option value="">Todos los estados</option>
+            <option value="pendiente">Pendiente</option>
+            <option value="en_progreso">En progreso</option>
+            <option value="completado">Completado</option>
+            <option value="cancelado">Cancelado</option>
+          </select>
+        </div>
+      </div>
+      
+      <!-- ✅ INDICADOR DE RESULTADOS MEJORADO -->
+      <div class="mt-4 flex justify-between items-center text-sm text-gray-600">
+        <div class="flex items-center gap-4">
+          <span>Mostrando {{ serviciosFiltrados.length }} de {{ servicios.length }} servicios</span>
+          <button 
+            v-if="hayFiltros"
+            @click="limpiarFiltros"
+            class="text-blue-600 hover:text-blue-800 text-sm"
+          >
+            Limpiar filtros
+          </button>
+        </div>
+        <div class="flex items-center gap-4">
+          <label class="flex items-center gap-2">
+            <input
+              v-model="useVirtualScroll"
+              type="checkbox"
+              class="rounded text-primary-600"
+            >
+            <span>Scroll virtual (para listas grandes)</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lista de Servicios con opción de Virtual Scroll -->
+    <div class="card">
+      <!-- Lista Virtual para grandes cantidades de datos -->
+      <VirtualList
+        v-if="useVirtualScroll && serviciosFiltrados.length > 50"
+        :items="serviciosFiltrados"
+        :item-height="80"
+        container-height="600px"
+        :buffer="5"
+        key-field="id"
+      >
+        <template #default="{ item: servicio }">
+          <div class="border-b border-gray-200 px-6 py-4 hover:bg-gray-50 transition-colors">
+            <div class="grid grid-cols-9 gap-4 items-center">
+              <!-- Vehículo -->
+              <div class="col-span-2">
+                <div class="flex items-center">
+                  <Car class="h-5 w-5 text-gray-400 mr-2" />
+                  <div>
+                    <div class="text-sm font-medium text-gray-900">
+                      {{ servicio.vehiculo?.marca }} {{ servicio.vehiculo?.modelo }}
+                    </div>
+                    <div class="text-sm text-gray-500">{{ servicio.vehiculo?.patente }}</div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Cliente -->
+              <div>
+                <div class="text-sm text-gray-900">{{ servicio.cliente?.nombre }}</div>
+                <div class="text-sm text-gray-500">{{ formatearTelefonoDisplay(servicio.cliente?.telefono) }}</div>
+              </div>
+              
+              <!-- Tipo de Servicio y Fecha -->
+              <div>
+                <div class="text-sm font-medium text-gray-900">{{ servicio.tipoServicio }}</div>
+                <div class="text-xs text-gray-500">{{ formatearFecha(servicio.fechaServicio) }}</div>
+              </div>
+              
+              <!-- Próximo Servicio -->
+              <div>
+                <div class="text-sm text-gray-900">
+                  {{ servicio.proximoServicio ? formatearFecha(servicio.proximoServicio) : 'No programado' }}
+                </div>
+              </div>
+              
+              <!-- Días Restantes -->
+              <div>
+                <span v-if="servicio.proximoServicio" :class="[
+                  'inline-flex px-2 py-1 text-xs font-semibold rounded-full',
+                  calcularDiasRestantes(servicio.proximoServicio) < 0 ? 'bg-red-100 text-red-900' :
+                  calcularDiasRestantes(servicio.proximoServicio) <= 7 ? 'bg-orange-100 text-orange-900' :
+                  calcularDiasRestantes(servicio.proximoServicio) <= 30 ? 'bg-yellow-100 text-yellow-900' :
+                  'bg-green-100 text-green-900'
+                ]">
+                  {{ formatearDiasRestantes(servicio.proximoServicio) }}
+                </span>
+                <span v-else class="text-gray-400 text-xs">-</span>
+              </div>
+              
+              <!-- Estado -->
+              <div>
+                <span 
+                  :class="[
+                    'inline-flex px-2 py-1 text-xs font-semibold rounded-full',
+                    servicio.estado === 'completado' ? 'bg-green-100 text-green-900' :
+                    servicio.estado === 'en_progreso' ? 'bg-blue-100 text-blue-900' :
+                    servicio.estado === 'pendiente' ? 'bg-amber-100 text-amber-900' :
+                    'bg-red-100 text-red-900'
+                  ]"
+                >
+                  {{ formatearEstado(servicio.estado) }}
+                </span>
+              </div>
+              
+              <!-- Costo -->
+              <div class="text-right">
+                <div class="text-sm font-medium text-gray-900">
+                  ${{ servicio.costo?.toLocaleString() || '0' }}
+                </div>
+              </div>
+              
+              <!-- Acciones -->
+              <div class="flex justify-end space-x-2">
+                <button
+                  @click="editarServicio(servicio)"
+                  class="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                  title="Editar servicio"
+                >
+                  <Edit2 class="h-4 w-4" />
+                </button>
+                <button
+                  @click="eliminarServicioConfirm(servicio.id)"
+                  class="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                  title="Eliminar servicio"
+                >
+                  <Trash2 class="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </template>
+      </VirtualList>
+
+      <!-- Tabla tradicional para cantidades pequeñas -->
+      <div v-else class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Vehículo
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Cliente
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Tipo de Servicio
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Fecha
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Próximo Servicio
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Días Restantes
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Estado
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Costo Final
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Acciones
+              </th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <tr 
+              v-for="servicio in paginatedServicios" 
+              :key="servicio.id"
+              class="hover:bg-gray-50 transition-colors"
+            >
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="flex items-center">
+                  <Car class="h-5 w-5 text-gray-400 mr-2" />
+                  <div>
+                    <div class="text-sm font-medium text-gray-900">
+                      {{ servicio.vehiculo?.marca }} {{ servicio.vehiculo?.modelo }}
+                    </div>
+                    <div class="text-sm text-gray-500">{{ servicio.vehiculo?.patente }}</div>
+                  </div>
+                </div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm text-gray-900">{{ servicio.cliente?.nombre }}</div>
+                <div class="text-sm text-gray-500">{{ formatearTelefonoDisplay(servicio.cliente?.telefono) }}</div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm text-gray-900">{{ servicio.tipoServicio }}</div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                {{ formatearFecha(servicio.fechaServicio) }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                {{ servicio.proximoServicio ? formatearFecha(servicio.proximoServicio) : 'No programado' }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span v-if="servicio.proximoServicio" :class="[
+                  'inline-flex px-2 py-1 text-xs font-semibold rounded-full',
+                  calcularDiasRestantes(servicio.proximoServicio) < 0 ? 'bg-red-100 text-red-900' :
+                  calcularDiasRestantes(servicio.proximoServicio) <= 7 ? 'bg-orange-100 text-orange-900' :
+                  calcularDiasRestantes(servicio.proximoServicio) <= 30 ? 'bg-yellow-100 text-yellow-900' :
+                  'bg-green-100 text-green-900'
+                ]">
+                  {{ formatearDiasRestantes(servicio.proximoServicio) }}
+                </span>
+                <span v-else class="text-gray-400">-</span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span 
+                  :class="[
+                    'inline-flex px-2 py-1 text-xs font-semibold rounded-full',
+                    servicio.estado === 'completado' ? 'bg-green-100 text-green-900' :
+                    servicio.estado === 'en_progreso' ? 'bg-blue-100 text-blue-900' :
+                    servicio.estado === 'pendiente' ? 'bg-amber-100 text-amber-900' :
+                    'bg-red-100 text-red-900'
+                  ]"
+                >
+                  {{ formatearEstado(servicio.estado) }}
+                </span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                ${{ servicio.costo?.toLocaleString() || '0' }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                <div class="flex space-x-2">
+                  <button
+                    @click="editarServicio(servicio)"
+                    class="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                    title="Editar servicio"
+                  >
+                    <Edit2 class="h-4 w-4" />
+                  </button>
+                  <button
+                    @click="eliminarServicioConfirm(servicio.id)"
+                    class="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                    title="Eliminar servicio"
+                  >
+                    <Trash2 class="h-4 w-4" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        
+        <!-- Paginación para tabla tradicional -->
+        <div v-if="!useVirtualScroll && totalPages > 1" class="mt-4">
+          <PaginationControls
+            :current-page="currentPage"
+            :total-pages="totalPages"
+            :items-per-page="itemsPerPage"
+            :pagination-info="paginationInfo"
+            :page-range="pageRange"
+            :go-to-page="goToPage"
+            :next-page="nextPage"
+            :prev-page="prevPage"
+            :first-page="firstPage"
+            :last-page="lastPage"
+            @update:itemsPerPage="itemsPerPage = $event"
+          />
+        </div>
+        
+        <!-- Estado vacío -->
+        <div v-if="serviciosFiltrados.length === 0" class="text-center py-12">
+          <Wrench class="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h3 class="text-lg font-medium text-gray-900 mb-2">
+            {{ hayFiltros ? 'No se encontraron servicios' : 'No hay servicios registrados' }}
+          </h3>
+          <p class="text-gray-500 mb-6">
+            {{ hayFiltros ? 'Intenta con otros filtros' : 'Comienza agregando tu primer servicio' }}
+          </p>
+          <button
+            v-if="!hayFiltros"
+            @click="mostrarFormulario = true"
+            class="btn-primary"
+          >
+            Agregar Servicio
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Formulario -->
+    <div
+      v-if="mostrarFormulario"
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+    >
+      <div class="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+        <h2 class="text-xl font-bold text-gray-900 mb-4">
+          {{ servicioEditando ? 'Editar Servicio' : 'Nuevo Servicio' }}
+        </h2>
+
+        <form @submit.prevent="guardarServicio" class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                Vehículo *
+              </label>
+              <select
+                v-model="formulario.vehiculoId"
+                @change="onVehiculoChange"
+                required
+                class="input-field"
+              >
+                <option value="">Seleccionar vehículo</option>
+                <option v-for="vehiculo in vehiculos" :key="vehiculo.id" :value="vehiculo.id">
+                  {{ vehiculo.marca }} {{ vehiculo.modelo }} - {{ vehiculo.patente }}
+                </option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                Cliente
+              </label>
+              <input
+                :value="clienteSeleccionado?.nombre || ''"
+                type="text"
+                readonly
+                class="input-field bg-gray-50"
+                placeholder="Se selecciona automáticamente"
+              />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                Tipo de Servicio *
+              </label>
+              <select
+                v-model="formulario.tipoServicio"
+                required
+                class="input-field"
+                @change="onTipoServicioChange"
+              >
+                <option value="">Seleccionar tipo</option>
+                <option value="Cambio de aceite">Cambio de aceite</option>
+                <option value="Mantenimiento general">Mantenimiento general</option>
+                <option value="Reparación de frenos">Reparación de frenos</option>
+                <option value="Cambio de filtros">Cambio de filtros</option>
+                <option value="Alineación y balanceo">Alineación y balanceo</option>
+                <option value="Reparación de motor">Reparación de motor</option>
+                <option value="Cambio de neumáticos">Cambio de neumáticos</option>
+                <option value="Mantenimiento preventivo">Mantenimiento preventivo</option>
+                <option value="Diagnóstico">Diagnóstico</option>
+                <option value="Otro">Otro</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                Fecha del Servicio *
+              </label>
+              <input
+                v-model="formulario.fechaServicio"
+                type="date"
+                required
+                class="input-field"
+                @change="onFechaServicioChange"
+              />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                Estado *
+              </label>
+              <select
+                v-model="formulario.estado"
+                required
+                class="input-field"
+              >
+                <option value="pendiente">Pendiente</option>
+                <option value="en_progreso">En progreso</option>
+                <option value="completado">Completado</option>
+                <option value="cancelado">Cancelado</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                Costo Final ($) *
+              </label>
+              <input
+                v-model="formulario.costo"
+                type="number"
+                min="0"
+                step="0.01"
+                class="input-field"
+                placeholder="Precio final cobrado"
+                required
+              />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                Kilometraje actual
+              </label>
+              <input
+                v-model="formulario.kilometrajeActual"
+                type="number"
+                min="0"
+                class="input-field"
+                placeholder="Kilometraje al momento del servicio"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                Próximo servicio (fecha)
+                <span v-if="formulario.tipoServicio === 'Mantenimiento general'" class="text-xs text-blue-600">
+                  ✨ Se calcula automáticamente (+1 año)
+                </span>
+              </label>
+              <input
+                v-model="formulario.proximoServicio"
+                type="date"
+                class="input-field"
+                :class="{
+                  'bg-blue-50 border-blue-300': formulario.tipoServicio === 'Mantenimiento general'
+                }"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              Descripción del servicio
+            </label>
+            <textarea
+              v-model="formulario.descripcion"
+              class="input-field"
+              rows="3"
+              placeholder="Describe el trabajo realizado..."
+            ></textarea>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              Observaciones
+            </label>
+            <textarea
+              v-model="formulario.observaciones"
+              class="input-field"
+              rows="3"
+              placeholder="Observaciones adicionales..."
+            ></textarea>
+          </div>
+
+          <div class="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              @click="cancelarFormulario"
+              class="btn-secondary"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              class="btn-primary"
+            >
+              {{ servicioEditando ? 'Actualizar' : 'Crear' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { 
+  Plus, 
+  Car, 
+  Edit2, 
+  Trash2, 
+  Wrench,
+  Search
+} from 'lucide-vue-next'
+import { useAutoService } from '../composables/useAutoService'
+import { usePagination } from '../composables/usePagination'
+import { useDebounce, useMemoize } from '../composables/useOptimization'
+import { useMemoryLeakPrevention } from '../composables/useMemoryLeakPrevention'
+import VirtualList from '../components/VirtualList.vue'
+import PaginationControls from '../components/PaginationControls.vue'
+
+const route = useRoute()
+
+const {
+  clientes,
+  vehiculos,
+  servicios,
+  agregarServicio,
+  actualizarServicio,
+  eliminarServicio,
+  obtenerVehiculoPorId,
+  obtenerClientePorId,
+  formatearTelefonoDisplay
+} = useAutoService()
+
+// Memory leak prevention
+const { safeInterval, detectLeaks } = useMemoryLeakPrevention()
+
+// Estado del componente
+const mostrarFormulario = ref(false)
+const servicioEditando = ref(null)
+const filtroVehiculo = ref('')
+const filtroCliente = ref('')
+const filtroEstado = ref('')
+const useVirtualScroll = ref(false)
+
+// 🔧 BÚSQUEDA CORREGIDA - Directo sin debounce
+const filtroTexto = ref('')
+
+// Formulario
+const formulario = ref({
+  vehiculoId: '',
+  clienteId: '',
+  tipoServicio: '',
+  fechaServicio: '',
+  estado: 'pendiente',
+  costo: '',
+  kilometrajeActual: '',
+  proximoServicio: '',
+  descripcion: '',
+  observaciones: ''
+})
+
+// Computed optimizado con memoización
+const serviciosConRelaciones = useMemoize(() => {
+  return servicios.value.map(servicio => ({
+    ...servicio,
+    vehiculo: obtenerVehiculoPorId(servicio.vehiculoId),
+    cliente: obtenerClientePorId(servicio.clienteId)
+  }))
+}, [servicios])
+
+const serviciosFiltrados = computed(() => {
+  let resultado = serviciosConRelaciones.value
+
+  // 🔍 FILTRO POR TEXTO - EXPANDIDO
+  if (filtroTexto.value && filtroTexto.value.trim() !== '') {
+    const filtro = filtroTexto.value.toLowerCase().trim()
+    resultado = resultado.filter(servicio => 
+      servicio.tipoServicio?.toLowerCase().includes(filtro) ||
+      servicio.descripcion?.toLowerCase().includes(filtro) ||
+      servicio.observaciones?.toLowerCase().includes(filtro) ||
+      servicio.vehiculo?.marca?.toLowerCase().includes(filtro) ||
+      servicio.vehiculo?.modelo?.toLowerCase().includes(filtro) ||
+      servicio.vehiculo?.patente?.toLowerCase().includes(filtro) ||
+      servicio.cliente?.nombre?.toLowerCase().includes(filtro)
+    )
+  }
+
+  // Filtro por vehículo
+  if (filtroVehiculo.value && filtroVehiculo.value !== '') {
+    const vehiculoIdFiltro = parseInt(filtroVehiculo.value)
+    resultado = resultado.filter(servicio => 
+      servicio.vehiculoId === vehiculoIdFiltro
+    )
+  }
+
+  // Filtro por cliente
+  if (filtroCliente.value && filtroCliente.value !== '') {
+    const clienteIdFiltro = parseInt(filtroCliente.value)
+    resultado = resultado.filter(servicio => 
+      servicio.clienteId === clienteIdFiltro
+    )
+  }
+
+  // Filtro por estado
+  if (filtroEstado.value && filtroEstado.value !== '') {
+    resultado = resultado.filter(servicio => 
+      servicio.estado === filtroEstado.value
+    )
+  }
+
+  return resultado.sort((a, b) => new Date(b.fechaServicio) - new Date(a.fechaServicio))
+})
+
+// Paginación para cuando no se usa virtual scroll
+const {
+  currentPage,
+  itemsPerPage,
+  paginatedItems: paginatedServicios,
+  totalPages,
+  paginationInfo,
+  pageRange,
+  goToPage,
+  nextPage,
+  prevPage,
+  firstPage,
+  lastPage
+} = usePagination(serviciosFiltrados, 20)
+
+// ✅ COMPUTED MEJORADOS
+const hayFiltros = computed(() => {
+  const filtros = Boolean(
+    (filtroTexto.value && filtroTexto.value.trim()) ||
+    (filtroVehiculo.value && filtroVehiculo.value !== '') ||
+    (filtroCliente.value && filtroCliente.value !== '') ||
+    (filtroEstado.value && filtroEstado.value !== '')
+  )
+  return filtros
+})
+
+// 🔧 FUNCIÓN PARA LIMPIAR FILTROS (NUEVA)
+const limpiarFiltros = () => {
+  console.log('🧹 Limpiando todos los filtros')
+  
+  filtroTexto.value = ''
+  filtroVehiculo.value = ''
+  filtroCliente.value = ''
+  filtroEstado.value = ''
+}
+
+const clienteSeleccionado = computed(() => {
+  if (formulario.value.vehiculoId) {
+    const vehiculo = obtenerVehiculoPorId(parseInt(formulario.value.vehiculoId))
+    return vehiculo ? obtenerClientePorId(vehiculo.clienteId) : null
+  }
+  return null
+})
+
+// Funciones
+const formatearEstado = (estado) => {
+  const estados = {
+    pendiente: 'Pendiente',
+    en_progreso: 'En progreso',
+    completado: 'Completado',
+    cancelado: 'Cancelado'
+  }
+  return estados[estado] || estado
+}
+
+// FUNCIÓN PARA CORREGIR EL PROBLEMA DE FECHAS
+const formatearFecha = (fecha) => {
+  if (!fecha) return ''
+  
+  // Crear fecha local para evitar problema de zona horaria
+  const fechaLocal = new Date(fecha + 'T00:00:00')
+  
+  return fechaLocal.toLocaleDateString('es-ES', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  })
+}
+
+// FUNCIONES PARA CALCULAR DÍAS RESTANTES
+const calcularDiasRestantes = (fechaProximoServicio) => {
+  if (!fechaProximoServicio) return null
+  
+  const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0) // Resetear horas para comparación exacta
+  
+  const fechaServicio = new Date(fechaProximoServicio + 'T00:00:00')
+  
+  const diferenciaTiempo = fechaServicio.getTime() - hoy.getTime()
+  const diferenciaDias = Math.ceil(diferenciaTiempo / (1000 * 3600 * 24))
+  
+  return diferenciaDias
+}
+
+const formatearDiasRestantes = (fechaProximoServicio) => {
+  const dias = calcularDiasRestantes(fechaProximoServicio)
+  
+  if (dias === null) return '-'
+  
+  if (dias < 0) {
+    return `${Math.abs(dias)} días vencido`
+  } else if (dias === 0) {
+    return 'Hoy'
+  } else if (dias === 1) {
+    return 'Mañana'
+  } else {
+    return `${dias} días`
+  }
+}
+
+const limpiarFormulario = () => {
+  formulario.value = {
+    vehiculoId: '',
+    clienteId: '',
+    tipoServicio: '',
+    fechaServicio: '',
+    estado: 'pendiente',
+    costo: '',
+    kilometrajeActual: '',
+    proximoServicio: '',
+    descripcion: '',
+    observaciones: ''
+  }
+}
+
+const onVehiculoChange = () => {
+  if (formulario.value.vehiculoId) {
+    const vehiculo = obtenerVehiculoPorId(parseInt(formulario.value.vehiculoId))
+    if (vehiculo) {
+      formulario.value.clienteId = vehiculo.clienteId
+    }
+  }
+}
+
+// 📅 NUEVA FUNCIÓN: Calcular próximo servicio automáticamente
+const calcularProximoServicio = () => {
+  // Solo calcular si es "Mantenimiento general" y hay fecha de servicio
+  if (formulario.value.tipoServicio === 'Mantenimiento general' && formulario.value.fechaServicio) {
+    const fechaServicio = new Date(formulario.value.fechaServicio)
+    
+    // Agregar un año
+    const fechaProximo = new Date(fechaServicio)
+    fechaProximo.setFullYear(fechaServicio.getFullYear() + 1)
+    
+    // Formatear como YYYY-MM-DD para el input date
+    const proximoServicio = fechaProximo.toISOString().split('T')[0]
+    formulario.value.proximoServicio = proximoServicio
+    
+    console.log(`📅 Próximo mantenimiento general calculado: ${proximoServicio}`)
+  } else if (formulario.value.tipoServicio && formulario.value.tipoServicio !== 'Mantenimiento general') {
+    // Si cambia a otro tipo de servicio, limpiar el próximo servicio
+    // (excepto si está editando un servicio existente)
+    if (!servicioEditando.value) {
+      formulario.value.proximoServicio = ''
+      console.log('🧹 Próximo servicio limpiado (no es mantenimiento general)')
+    }
+  }
+}
+
+// 🔄 NUEVA FUNCIÓN: Manejar cambios en tipo de servicio
+const onTipoServicioChange = () => {
+  console.log('🔧 Cambio en tipo de servicio:', formulario.value.tipoServicio)
+  calcularProximoServicio()
+}
+
+// 📅 NUEVA FUNCIÓN: Manejar cambios en fecha de servicio
+const onFechaServicioChange = () => {
+  console.log('📅 Cambio en fecha de servicio:', formulario.value.fechaServicio)
+  calcularProximoServicio()
+}
+
+const editarServicio = (servicio) => {
+  servicioEditando.value = servicio
+  formulario.value = {
+    ...servicio,
+    fechaServicio: servicio.fechaServicio.split('T')[0],
+    proximoServicio: servicio.proximoServicio ? servicio.proximoServicio.split('T')[0] : '',
+    costo: servicio.costo || '',
+    kilometrajeActual: servicio.kilometrajeActual || '',
+    vehiculoId: servicio.vehiculoId.toString(),
+    clienteId: servicio.clienteId.toString()
+  }
+  mostrarFormulario.value = true
+}
+
+const guardarServicio = () => {
+  const datosServicio = {
+    ...formulario.value,
+    vehiculoId: parseInt(formulario.value.vehiculoId),
+    clienteId: parseInt(formulario.value.clienteId),
+    costo: formulario.value.costo ? parseFloat(formulario.value.costo) : 0,
+    kilometrajeActual: formulario.value.kilometrajeActual ? parseInt(formulario.value.kilometrajeActual) : 0,
+    fechaServicio: formulario.value.fechaServicio,
+    proximoServicio: formulario.value.proximoServicio || null
+  }
+
+  if (servicioEditando.value) {
+    actualizarServicio(servicioEditando.value.id, datosServicio)
+  } else {
+    agregarServicio(datosServicio)
+  }
+  cancelarFormulario()
+}
+
+const cancelarFormulario = () => {
+  mostrarFormulario.value = false
+  servicioEditando.value = null
+  limpiarFormulario()
+}
+
+const eliminarServicioConfirm = (servicioId) => {
+  if (confirm('¿Estás seguro de que deseas eliminar este servicio?')) {
+    eliminarServicio(servicioId)
+  }
+}
+
+// Inicialización
+onMounted(() => {
+  // Manejar parámetros de URL
+  if (route.query.vehiculo) {
+    filtroVehiculo.value = route.query.vehiculo
+  }
+  
+  if (route.query.nuevo === 'true') {
+    if (route.query.vehiculo) {
+      formulario.value.vehiculoId = route.query.vehiculo
+      onVehiculoChange()
+    }
+    mostrarFormulario.value = true
+  }
+  
+  // Activar virtual scroll automáticamente si hay muchos registros
+  if (servicios.value.length > 100) {
+    useVirtualScroll.value = true
+  }
+  
+  // Detectar memory leaks en desarrollo
+  if (import.meta.env.DEV) {
+    safeInterval(() => {
+      const leaks = detectLeaks()
+      if (leaks.length > 0) {
+        console.warn('[Servicios] Posibles memory leaks:', leaks)
+      }
+    }, 30000) // Cada 30 segundos
+  }
+})
+</script>

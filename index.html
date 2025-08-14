@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Servicio Automotriz - Gestión de Servicios</title>
+    
+    <!-- Cargar librerías de Google de forma más controlada -->
+    <script>
+      // Variable global para trackear el estado de carga
+      window.googleLibrariesLoaded = {
+        gapi: false,
+        gsi: false
+      };
+      
+      // Función para verificar si todas las librerías están cargadas
+      window.checkGoogleLibraries = function() {
+        return window.googleLibrariesLoaded.gapi && 
+               window.googleLibrariesLoaded.gsi && 
+               window.gapi && 
+               window.google && 
+               window.google.accounts;
+      };
+    </script>
+    
+    <!-- Google Identity Services -->
+    <script 
+      src="https://accounts.google.com/gsi/client" 
+      async 
+      onload="window.googleLibrariesLoaded.gsi = true; console.log('✅ Google Identity Services cargado');"
+      onerror="console.error('❌ Error cargando Google Identity Services');">
+    </script>
+    
+    <!-- Google API -->
+    <script 
+      src="https://apis.google.com/js/api.js" 
+      async 
+      onload="window.googleLibrariesLoaded.gapi = true; console.log('✅ Google API cargado');"
+      onerror="console.error('❌ Error cargando Google API');">
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
