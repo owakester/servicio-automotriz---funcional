@@ -1,1 +1,101 @@
-import { useAutoService } from './useAutoService'\nimport { useGoogleDrive } from './useGoogleDrive'\nimport { useNotifications } from './useNotifications'\n\nexport const useProximosServicios = () => {\n  const { vehiculos, servicios, obtenerClientePorId, obtenerVehiculoPorId, obtenerServiciosPorVehiculo } = useAutoService()\n  const { subirArchivoAGoogleDrive, estaAutenticado } = useGoogleDrive()\n  const { success, error } = useNotifications()\n\n  // Función para obtener datos de próximos servicios\n  const obtenerDatosProximosServicios = () => {\n    const hoy = new Date()\n    const proximosServicios = []\n\n    vehiculos.value.forEach(vehiculo => {\n      const cliente = obtenerClientePorId(vehiculo.clienteId)\n      const serviciosVehiculo = obtenerServiciosPorVehiculo(vehiculo.id)\n      \n      // Obtener el último servicio con fecha de próximo servicio\n      const ultimoServicio = serviciosVehiculo\n        .filter(s => s.proximoServicio)\n        .sort((a, b) => new Date(b.fechaServicio) - new Date(a.fechaServicio))[0]\n\n      if (ultimoServicio && ultimoServicio.proximoServicio) {\n        const fechaProximoServicio = new Date(ultimoServicio.proximoServicio)\n        const diasRestantes = Math.ceil((fechaProximoServicio - hoy) / (24 * 60 * 60 * 1000))\n        \n        let estado = 'Normal'\n        let prioridad = 'Baja'\n        \n        if (diasRestantes < 0) {\n          estado = 'Vencido'\n          prioridad = 'Crítica'\n        } else if (diasRestantes <= 7) {\n          estado = 'Urgente'\n          prioridad = 'Alta'\n        } else if (diasRestantes <= 30) {\n          estado = 'Próximo'\n          prioridad = 'Media'\n        }\n\n        proximosServicios.push({\n          fecha_proximo_servicio: ultimoServicio.proximoServicio,\n          dias_restantes: diasRestantes,\n          estado: estado,\n          prioridad: prioridad,\n          cliente_nombre: cliente?.nombre || 'Sin cliente',\n          cliente_telefono: cliente?.telefono || 'Sin teléfono',\n          cliente_email: cliente?.email || 'Sin email',\n          vehiculo_marca: vehiculo.marca,\n          vehiculo_modelo: vehiculo.modelo,\n          vehiculo_patente: vehiculo.patente,\n          vehiculo_año: vehiculo.año,\n          vehiculo_color: vehiculo.color || '',\n          ultimo_servicio_fecha: ultimoServicio.fechaServicio,\n          ultimo_servicio_tipo: ultimoServicio.tipoServicio,\n          ultimo_servicio_km: ultimoServicio.kilometrajeActual || 0,\n          ultimo_servicio_costo: ultimoServicio.costo || 0,\n          observaciones: ultimoServicio.observaciones || ''\n        })\n      }\n    })\n\n    // Ordenar por días restantes (más urgentes primero)\n    return proximosServicios.sort((a, b) => a.dias_restantes - b.dias_restantes)\n  }\n\n  // Función para convertir datos a CSV\n  const convertirACSV = (datos) => {\n    if (datos.length === 0) {\n      return 'No hay próximos servicios programados'\n    }\n\n    // Headers del CSV\n    const headers = [\n      'Fecha Próximo Servicio',\n      'Días Restantes',\n      'Estado',\n      'Prioridad',\n      'Cliente',\n      'Teléfono',\n      'Email',\n      'Marca',\n      'Modelo', \n      'Patente',\n      'Año',\n      'Color',\n      'Último Servicio (Fecha)',\n      'Último Servicio (Tipo)',\n      'Último Servicio (KM)',\n      'Último Servicio (Costo)',\n      'Observaciones'\n    ]\n\n    // Convertir datos a filas CSV\n    const filas = datos.map(servicio => [\n      new Date(servicio.fecha_proximo_servicio).toLocaleDateString('es-ES'),\n      servicio.dias_restantes,\n      servicio.estado,\n      servicio.prioridad,\n      `\"${servicio.cliente_nombre}\"`,\n      servicio.cliente_telefono,\n      servicio.cliente_email,\n      servicio.vehiculo_marca,\n      servicio.vehiculo_modelo,\n      servicio.vehiculo_patente,\n      servicio.vehiculo_año,\n      servicio.vehiculo_color,\n      new Date(servicio.ultimo_servicio_fecha).toLocaleDateString('es-ES'),\n      `\"${servicio.ultimo_servicio_tipo}\"`,\n      servicio.ultimo_servicio_km,\n      servicio.ultimo_servicio_costo,\n      `\"${servicio.observaciones}\"`\n    ])\n\n    // Combinar headers y filas\n    const csvContent = [headers, ...filas]\n      .map(fila => fila.join(','))\n      .join('\\n')\n\n    return csvContent\n  }\n\n  // Función para generar y subir CSV a Google Drive\n  const generarYSubirCSV = async () => {\n    try {\n      // Verificar autenticación\n      if (!estaAutenticado()) {\n        error('Debes conectarte a Google Drive primero')\n        return false\n      }\n\n      // Obtener datos\n      const datosServicios = obtenerDatosProximosServicios()\n      \n      if (datosServicios.length === 0) {\n        error('No hay próximos servicios programados para exportar')\n        return false\n      }\n\n      // Convertir a CSV\n      const csvContent = convertirACSV(datosServicios)\n      \n      // Crear blob del archivo\n      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' })\n      \n      // Generar nombre del archivo con fecha\n      const fechaHoy = new Date().toISOString().split('T')[0]\n      const nombreArchivo = `proximos_servicios_${fechaHoy}.csv`\n      \n      // Subir a Google Drive\n      const resultado = await subirArchivoAGoogleDrive(blob, nombreArchivo, {\n        description: `Reporte de próximos servicios generado el ${new Date().toLocaleString('es-ES')}`,\n        parents: ['root'] // Puedes cambiar esto por una carpeta específica\n      })\n\n      if (resultado.success) {\n        success(`CSV generado y subido a Google Drive: ${nombreArchivo}`)\n        return {\n          success: true,\n          fileId: resultado.fileId,\n          webViewLink: resultado.webViewLink,\n          nombreArchivo,\n          totalServicios: datosServicios.length\n        }\n      } else {\n        error('Error al subir el archivo a Google Drive')\n        return false\n      }\n    } catch (err) {\n      console.error('Error al generar CSV:', err)\n      error('Error al generar el archivo CSV')\n      return false\n    }\n  }\n\n  // Función para descargar CSV localmente (backup)\n  const descargarCSVLocal = () => {\n    try {\n      const datosServicios = obtenerDatosProximosServicios()\n      \n      if (datosServicios.length === 0) {\n        error('No hay próximos servicios programados para exportar')\n        return\n      }\n\n      const csvContent = convertirACSV(datosServicios)\n      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' })\n      \n      const fechaHoy = new Date().toISOString().split('T')[0]\n      const nombreArchivo = `proximos_servicios_${fechaHoy}.csv`\n      \n      // Crear enlace de descarga\n      const link = document.createElement('a')\n      link.href = URL.createObjectURL(blob)\n      link.download = nombreArchivo\n      \n      document.body.appendChild(link)\n      link.click()\n      document.body.removeChild(link)\n      \n      success(`CSV descargado: ${nombreArchivo}`)\n    } catch (err) {\n      console.error('Error al descargar CSV:', err)\n      error('Error al descargar el archivo CSV')\n    }\n  }\n\n  // Función para obtener estadísticas de próximos servicios\n  const obtenerEstadisticasProximosServicios = () => {\n    const datos = obtenerDatosProximosServicios()\n    \n    const estadisticas = {\n      total: datos.length,\n      vencidos: datos.filter(s => s.estado === 'Vencido').length,\n      urgentes: datos.filter(s => s.estado === 'Urgente').length,\n      proximos: datos.filter(s => s.estado === 'Próximo').length,\n      normales: datos.filter(s => s.estado === 'Normal').length\n    }\n\n    return estadisticas\n  }\n\n  return {\n    obtenerDatosProximosServicios,\n    convertirACSV,\n    generarYSubirCSV,\n    descargarCSVLocal,\n    obtenerEstadisticasProximosServicios\n  }\n}\n
+import { useAutoService } from './useAutoService'
+import { useGoogleDrive } from './useGoogleDrive'
+import { useNotifications } from './useNotifications'
+
+export const useProximosServicios = () => {
+  const { vehiculos, servicios, obtenerClientePorId, obtenerServiciosPorVehiculo } = useAutoService()
+  const { subirArchivoAGoogleDrive, estaAutenticado } = useGoogleDrive()
+  const { success, error } = useNotifications()
+
+  const obtenerDatosProximosServicios = () => {
+    const hoy = new Date()
+    hoy.setHours(0, 0, 0, 0)
+    const proximosServicios = []
+
+    vehiculos.value.forEach(vehiculo => {
+      const cliente = obtenerClientePorId(vehiculo.clienteId)
+      const serviciosVehiculo = obtenerServiciosPorVehiculo(vehiculo.id)
+      
+      const ultimoServicio = serviciosVehiculo
+        .filter(s => s.proximoServicio)
+        .sort((a, b) => new Date(b.fechaServicio) - new Date(a.fechaServicio))[0]
+
+      if (ultimoServicio && ultimoServicio.proximoServicio) {
+        const fechaProximoServicio = new Date(ultimoServicio.proximoServicio + 'T00:00:00')
+        const diasRestantes = Math.ceil((fechaProximoServicio - hoy) / (1000 * 60 * 60 * 24))
+        
+        let estado = 'Normal'; let prioridad = 'Baja'
+        
+        if (diasRestantes < 0) {
+          estado = 'Vencido'; prioridad = 'Crítica'
+        } else if (diasRestantes <= 7) {
+          estado = 'Urgente'; prioridad = 'Alta'
+        } else if (diasRestantes <= 30) {
+          estado = 'Próximo'; prioridad = 'Media'
+        }
+
+        proximosServicios.push({
+          fecha_proximo_servicio: ultimoServicio.proximoServicio,
+          dias_restantes: diasRestantes, estado, prioridad,
+          cliente_nombre: cliente?.nombre || 'Sin cliente',
+          cliente_telefono: cliente?.telefono || 'Sin teléfono',
+          cliente_email: cliente?.email || 'Sin email',
+          vehiculo_marca: vehiculo.marca, vehiculo_modelo: vehiculo.modelo,
+          vehiculo_patente: vehiculo.patente, vehiculo_año: vehiculo.año,
+          vehiculo_color: vehiculo.color || '',
+          ultimo_servicio_fecha: ultimoServicio.fechaServicio,
+          ultimo_servicio_tipo: ultimoServicio.tipoServicio,
+          ultimo_servicio_km: ultimoServicio.kilometrajeActual || 0,
+          ultimo_servicio_costo: ultimoServicio.costo || 0,
+          observaciones: (ultimoServicio.observaciones || '').replace(/"/g, '""')
+        })
+      }
+    })
+    return proximosServicios.sort((a, b) => a.dias_restantes - b.dias_restantes)
+  }
+
+  const convertirACSV = (datos) => {
+    if (datos.length === 0) { return '' }
+    const headers = [
+      'Fecha Próximo Servicio', 'Días Restantes', 'Estado', 'Prioridad', 'Cliente', 'Teléfono',
+      'Email', 'Marca', 'Modelo', 'Patente', 'Año', 'Color', 'Último Servicio (Fecha)',
+      'Último Servicio (Tipo)', 'Último Servicio (KM)', 'Último Servicio (Costo)', 'Observaciones'
+    ]
+    const filas = datos.map(s => [
+      new Date(s.fecha_proximo_servicio + 'T00:00:00').toLocaleDateString('es-ES'),
+      s.dias_restantes, s.estado, s.prioridad, `"${s.cliente_nombre}"`, s.cliente_telefono,
+      s.cliente_email, s.vehiculo_marca, s.vehiculo_modelo, s.vehiculo_patente, s.vehiculo_año,
+      s.vehiculo_color, new Date(s.ultimo_servicio_fecha + 'T00:00:00').toLocaleDateString('es-ES'),
+      `"${s.ultimo_servicio_tipo}"`, s.ultimo_servicio_km, s.ultimo_servicio_costo, `"${s.observaciones}"`
+    ])
+    return [headers, ...filas].map(fila => fila.join(',')).join('\n')
+  }
+
+  const descargarCSVLocal = () => {
+    try {
+      const datosServicios = obtenerDatosProximosServicios()
+      if (datosServicios.length === 0) {
+        error('No hay próximos servicios programados para exportar'); return
+      }
+      const csvContent = convertirACSV(datosServicios)
+      if (!csvContent) return;
+
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
+      const fechaHoy = new Date().toISOString().split('T')[0]
+      const nombreArchivo = `proximos_servicios_${fechaHoy}.csv`
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob); link.download = nombreArchivo;
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
+      success(`CSV descargado: ${nombreArchivo}`)
+    } catch (err) {
+      console.error('Error al descargar CSV:', err); error('Error al descargar el archivo CSV')
+    }
+  }
+
+  // ✅ BLOQUE CORREGIDO
+  return {
+    obtenerDatosProximosServicios,
+    convertirACSV, // Esta función faltaba aquí
+    descargarCSVLocal
+  }
+}

@@ -486,6 +486,11 @@ import { useBackupSystem } from '../composables/useBackupSystem'
 import { useAutoService } from '../composables/useAutoService'
 import { useNotifications } from '../composables/useNotifications'
 import { useGoogleDrive } from '../composables/useGoogleDrive'
+
+// al inicio, junto a los otros `import`
+import { AlertTriangle } from 'lucide-vue-next'
+import { useProximosServicios } from '../composables/useProximosServicios'
+
 // ⬇️ nuevos flags de UI
 const subiendoNube = ref(false)
 const subiendoLocal = ref(false)
@@ -724,4 +729,7 @@ onMounted(() => {
  
   console.log('🆕 Funciones de debug disponibles en window.debugBackup')
 })
+
+// ... debajo de los otros `use` composables
+const { descargarCSVLocal: descargarProximosServiciosCSV } = useProximosServicios()
 </script>
