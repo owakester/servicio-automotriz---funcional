@@ -6,7 +6,7 @@
         <div class="flex justify-between items-center h-16">
           <div class="flex items-center">
             <Car class="h-8 w-8 text-primary-600 mr-2" />
-            <span class="text-xl font-bold text-gray-900">AutoService Pro</span>
+            <span class="text-xl font-bold text-gray-900">ServiceCar</span>
           </div>
           
           <div class="flex space-x-4">
