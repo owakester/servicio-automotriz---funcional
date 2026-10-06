@@ -1,10 +1,13 @@
 import { computed } from 'vue'
 import { useAutoService } from './useAutoService'
 import { useNotifications } from './useNotifications'
+import { diasHastaFecha, estaFechaVencida } from '../utils/dates'
+import { useFechaActual } from './useFechaActual'
 
 export const useOrdenes = () => {
   const { ordenes, obtenerVehiculoPorId, obtenerClientePorId, agregarOrden, actualizarOrden: actualizarOrdenService, eliminarOrden: eliminarOrdenService } = useAutoService()
-  const { error } = useNotifications()
+  const { error, success } = useNotifications()
+  const { fechaActual } = useFechaActual()
 
   // Generar número de orden automático
   const generarNumeroOrden = () => {
@@ -94,10 +97,8 @@ export const useOrdenes = () => {
 
   // Órdenes vencidas
   const ordenesVencidas = computed(() => {
-    const hoy = new Date()
     return ordenesCompletas.value.filter(o => 
-      o.fechaVencimiento && 
-      new Date(o.fechaVencimiento) < hoy && 
+      estaFechaVencida(o.fechaVencimiento, fechaActual.value) &&
       o.estado !== 'completada' && 
       o.estado !== 'cancelada'
     )
@@ -105,16 +106,11 @@ export const useOrdenes = () => {
 
   // Órdenes próximas a vencer
   const ordenesProximasVencer = computed(() => {
-    const hoy = new Date()
-    const enTresDias = new Date(hoy.getTime() + 3 * 24 * 60 * 60 * 1000)
-    
-    return ordenesCompletas.value.filter(o => 
-      o.fechaVencimiento && 
-      new Date(o.fechaVencimiento) >= hoy &&
-      new Date(o.fechaVencimiento) <= enTresDias &&
-      o.estado !== 'completada' && 
-      o.estado !== 'cancelada'
-    )
+    return ordenesCompletas.value.filter(o => {
+      const dias = diasHastaFecha(o.fechaVencimiento, fechaActual.value)
+      return dias !== null && dias >= 0 && dias <= 3 &&
+        o.estado !== 'completada' && o.estado !== 'cancelada'
+    })
   })
 
   // Estadísticas de órdenes

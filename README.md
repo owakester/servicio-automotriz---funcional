@@ -209,7 +209,9 @@ En **Configuración** puedes:
 ## 📝 Notas Importantes
 
 - **Almacenamiento**: Los datos se guardan en LocalStorage y se respaldan automáticamente en IndexedDB
-- **Recuperación**: Si LocalStorage falta o está corrupto, se restaura la última copia local válida
+- **Dirección fija**: Usar siempre `http://localhost:5173` con `npm run dev`. Si el puerto está ocupado, Vite se detiene en lugar de cambiarlo y mostrar otro almacenamiento. `npm run preview` usa 4173 solo para verificar la compilación, no para el uso habitual del taller.
+- **Reportes**: Los importes y el resumen del período incluyen únicamente servicios completados y se muestran como «Total de trabajos realizados». No existe un registro de cobros; no deben interpretarse como dinero cobrado. El conteo anual de servicios conserva todos los estados.
+- **Recuperación**: Si LocalStorage falta, está corrupto o conserva una versión anterior tras un fallo de escritura, se restaura la última copia local válida. Las revisiones de guardado evitan que una copia antigua reemplace cambios más recientes o una restauración manual.
 - **Backup externo**: Google Drive conserva las dos copias más recientes cuando está conectado
 - **Navegadores**: Compatible con navegadores modernos (Chrome, Firefox, Safari, Edge)
 - **Datos**: Solo se envían a Google Drive cuando el usuario conecta y habilita esa opción

@@ -150,6 +150,39 @@ await probar('no se elimina un cliente que conserva vehículos asociados', async
   assert.equal(datos.clientes.value.some((item) => item.id === cliente.id), true)
 })
 
+await probar('el cliente de un vehículo queda fijo desde el alta, incluso sin historial', async () => {
+  const titular = datos.agregarCliente({ nombre: 'Titular original', email: 'original@example.com' })
+  const otroCliente = datos.agregarCliente({ nombre: 'Otro cliente', email: 'otro@example.com' })
+  const vehiculo = datos.agregarVehiculo({ clienteId: titular.id, marca: 'Ford', modelo: 'Focus', patente: 'AE123FG' })
+  assert.equal(datos.actualizarVehiculo(vehiculo.id, { clienteId: otroCliente.id, modelo: 'No debe guardarse' }), null)
+  assert.equal(datos.obtenerVehiculoPorId(vehiculo.id).clienteId, titular.id)
+  assert.equal(datos.obtenerVehiculoPorId(vehiculo.id).modelo, 'Focus')
+  assert.equal(datos.actualizarVehiculo(vehiculo.id, { modelo: 'Focus actualizado' }).modelo, 'Focus actualizado')
+  assert.ok(datos.actualizarVehiculo(vehiculo.id, { clienteId: String(titular.id), color: 'Blanco' }))
+  assert.equal(datos.obtenerVehiculoPorId(vehiculo.id).clienteId, titular.id)
+  await esperarPersistencia()
+  assert.equal(JSON.parse(localStorage.getItem('autoservice_vehiculos'))[0].clienteId, titular.id)
+})
+
+await probar('rechazar un cambio de titular conserva las relaciones de servicios y órdenes', async () => {
+  const titular = datos.agregarCliente({ nombre: 'Titular original', email: 'original@example.com' })
+  const otroCliente = datos.agregarCliente({ nombre: 'Otro cliente', email: 'otro@example.com' })
+  const vehiculo = datos.agregarVehiculo({ clienteId: titular.id, marca: 'Ford', modelo: 'Focus', patente: 'AF123GH' })
+  datos.agregarServicio({ clienteId: titular.id, vehiculoId: vehiculo.id, tipoServicio: 'General', fechaServicio: '2026-10-06' })
+  gestionOrdenes.crearOrden({ clienteId: titular.id, vehiculoId: vehiculo.id, descripcionTrabajo: 'Trabajo registrado' })
+  const antes = JSON.parse(JSON.stringify({
+    clientes: datos.clientes.value, vehiculos: datos.vehiculos.value,
+    servicios: datos.servicios.value, ordenes: datos.ordenes.value
+  }))
+  assert.equal(datos.actualizarVehiculo(vehiculo.id, { clienteId: otroCliente.id }), null)
+  const despues = {
+    clientes: datos.clientes.value, vehiculos: datos.vehiculos.value,
+    servicios: datos.servicios.value, ordenes: datos.ordenes.value
+  }
+  assert.deepEqual(despues, antes)
+  assert.equal(validarDatosAutoservice(despues), true)
+})
+
 await probar('no se elimina un vehículo que conserva servicios asociados', async () => {
   const cliente = datos.agregarCliente({ nombre: 'Titular', email: 'titular@example.com', telefono: '1111111111' })
   const vehiculo = datos.agregarVehiculo({ clienteId: cliente.id, marca: 'Ford', modelo: 'Focus', patente: 'AC123DE' })

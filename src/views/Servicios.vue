@@ -565,6 +565,10 @@ import { useDebounce, useMemoize } from '../composables/useOptimization'
 import { useMemoryLeakPrevention } from '../composables/useMemoryLeakPrevention'
 import VirtualList from '../components/VirtualList.vue'
 import PaginationControls from '../components/PaginationControls.vue'
+import { diasHastaFecha, fechaParaInput, formatearFecha, parsearFechaLocal, sumarAnos } from '../utils/dates'
+import { useFechaActual } from '../composables/useFechaActual'
+
+const { fechaActual } = useFechaActual()
 
 const route = useRoute()
 const router = useRouter()
@@ -659,7 +663,7 @@ const serviciosFiltrados = computed(() => {
     )
   }
 
-  return resultado.sort((a, b) => new Date(b.fechaServicio) - new Date(a.fechaServicio))
+  return resultado.sort((a, b) => parsearFechaLocal(b.fechaServicio) - parsearFechaLocal(a.fechaServicio))
 })
 
 // Paginación para cuando no se usa virtual scroll
@@ -717,33 +721,9 @@ const formatearEstado = (estado) => {
   return estados[estado] || estado
 }
 
-// FUNCIÓN PARA CORREGIR EL PROBLEMA DE FECHAS
-const formatearFecha = (fecha) => {
-  if (!fecha) return ''
-  
-  // Crear fecha local para evitar problema de zona horaria
-  const fechaLocal = new Date(fecha + 'T00:00:00')
-  
-  return fechaLocal.toLocaleDateString('es-ES', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  })
-}
-
 // FUNCIONES PARA CALCULAR DÍAS RESTANTES
 const calcularDiasRestantes = (fechaProximoServicio) => {
-  if (!fechaProximoServicio) return null
-  
-  const hoy = new Date()
-  hoy.setHours(0, 0, 0, 0) // Resetear horas para comparación exacta
-  
-  const fechaServicio = new Date(fechaProximoServicio + 'T00:00:00')
-  
-  const diferenciaTiempo = fechaServicio.getTime() - hoy.getTime()
-  const diferenciaDias = Math.ceil(diferenciaTiempo / (1000 * 3600 * 24))
-  
-  return diferenciaDias
+  return diasHastaFecha(fechaProximoServicio, fechaActual.value)
 }
 
 const formatearDiasRestantes = (fechaProximoServicio) => {
@@ -790,14 +770,7 @@ const onVehiculoChange = () => {
 const calcularProximoServicio = () => {
   // Solo calcular si es "Mantenimiento general" y hay fecha de servicio
   if (formulario.value.tipoServicio === 'Mantenimiento general' && formulario.value.fechaServicio) {
-    const fechaServicio = new Date(formulario.value.fechaServicio)
-    
-    // Agregar un año
-    const fechaProximo = new Date(fechaServicio)
-    fechaProximo.setFullYear(fechaServicio.getFullYear() + 1)
-    
-    // Formatear como YYYY-MM-DD para el input date
-    const proximoServicio = fechaProximo.toISOString().split('T')[0]
+    const proximoServicio = sumarAnos(formulario.value.fechaServicio)
     formulario.value.proximoServicio = proximoServicio
     
     console.log(`📅 Próximo mantenimiento general calculado: ${proximoServicio}`)
@@ -827,8 +800,8 @@ const editarServicio = (servicio) => {
   servicioEditando.value = servicio
   formulario.value = {
     ...servicio,
-    fechaServicio: servicio.fechaServicio.split('T')[0],
-    proximoServicio: servicio.proximoServicio ? servicio.proximoServicio.split('T')[0] : '',
+    fechaServicio: fechaParaInput(servicio.fechaServicio),
+    proximoServicio: servicio.proximoServicio ? fechaParaInput(servicio.proximoServicio) : '',
     costo: servicio.costo || '',
     kilometrajeActual: servicio.kilometrajeActual || '',
     vehiculoId: servicio.vehiculoId.toString(),

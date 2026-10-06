@@ -21,6 +21,7 @@
           <h2 id="important-title" class="text-lg font-semibold text-amber-900">Antes de empezar</h2>
           <ul class="mt-2 space-y-1 text-sm text-amber-900 list-disc pl-5">
             <li>Usá siempre la misma computadora y el mismo navegador.</li>
+            <li>Abrí siempre http://localhost:5173. Otra dirección o puerto muestra un almacenamiento distinto.</li>
             <li>Mantené una sola pestaña del programa abierta.</li>
             <li>No borres los datos del navegador ni uses el modo incógnito.</li>
             <li>Conectá Google Drive o descargá una copia externa con frecuencia.</li>
@@ -73,6 +74,7 @@
           <li>La patente debe tener formato <strong>ABC123</strong> o <strong>AB123CD</strong>.</li>
         </ol>
         <p class="mt-4 text-sm text-gray-600">Un vehículo con servicios u órdenes no puede eliminarse por error.</p>
+        <p class="mt-2 text-sm text-gray-600">El cliente se asigna al crear el vehículo y no se puede cambiar al editarlo.</p>
       </article>
 
       <article class="card">
@@ -128,6 +130,11 @@
       </div>
     </section>
 
+    <section class="card" aria-labelledby="reports-help-title">
+      <h2 id="reports-help-title" class="text-xl font-semibold text-gray-900 mb-2">Cómo interpretar los reportes</h2>
+      <p class="text-sm text-gray-600">El «Total de trabajos realizados» suma solo servicios completados, no pendientes, en progreso ni cancelados. No representa pagos registrados: el programa no lleva control de cobros. El listado anual de servicios incluye todos los estados.</p>
+    </section>
+
     <section class="card" aria-labelledby="backup-title">
       <div class="flex items-center gap-2 mb-3">
         <ShieldCheck class="h-5 w-5 text-green-600" aria-hidden="true" />
@@ -136,7 +143,7 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div>
           <h3 class="font-semibold text-gray-900">Protección automática local</h3>
-          <p class="text-sm text-gray-600 mt-1">El programa conserva hasta tres copias dentro del navegador y recupera la última válida cuando es necesario.</p>
+          <p class="text-sm text-gray-600 mt-1">El programa conserva hasta tres copias dentro del navegador. Si falla el guardado principal, recupera los cambios de la copia local más reciente. Ante una advertencia de guardado, descargá una copia desde Configuración.</p>
         </div>
         <div>
           <h3 class="font-semibold text-gray-900">Copia externa</h3>

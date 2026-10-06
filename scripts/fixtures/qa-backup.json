@@ -1,0 +1,10 @@
+{
+  "version": "1.0",
+  "fecha": "2026-10-06T12:00:00.000Z",
+  "datos": {
+    "clientes": [{ "id": 101, "nombre": "Cliente restaurado QA", "email": "restaurado@example.com", "telefono": "5491135888672", "fechaCreacion": "2026-10-05T12:00:00.000Z" }],
+    "vehiculos": [{ "id": 102, "clienteId": 101, "marca": "Toyota", "modelo": "Prueba restaurada", "anio": 2020, "patente": "QA123BC", "kilometraje": 50000 }],
+    "servicios": [{ "id": 103, "clienteId": 101, "vehiculoId": 102, "tipoServicio": "Cambio de aceite", "estado": "completado", "fechaServicio": "2026-10-06", "fechaCreacion": "2026-10-05T12:00:00.000Z", "costo": 55000 }],
+    "ordenes": [{ "id": 104, "numeroOrden": "OM-QA-RESTORE", "clienteId": 101, "vehiculoId": 102, "estado": "completada", "prioridad": "media", "fechaCreacion": "2026-10-05T12:00:00.000Z", "descripcionTrabajo": "Prueba sintética de restauración, no usar en el taller", "costoEstimado": 55000, "imagenes": [{ "fileId": "foto-qa-no-remota", "fileName": "foto-de-prueba.png", "descripcion": "Adjunto simulado para verificar restauración", "uploadedAt": "2026-10-05T12:00:00.000Z" }] }]
+  }
+}

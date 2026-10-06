@@ -1,0 +1,354 @@
+import assert from 'node:assert/strict'
+import { build } from 'esbuild'
+import 'fake-indexeddb/auto'
+import { IDBFactory } from 'fake-indexeddb'
+import { readFileSync } from 'node:fs'
+import { parse, compileScript } from '@vue/compiler-sfc'
+
+// Todo ocurre en almacenamientos simulados, sin tocar los datos del navegador.
+class LocalStorageMock {
+  data = new Map()
+  failWrites = false
+  failOnKey = null
+  getItem(key) { return this.data.get(key) ?? null }
+  setItem(key, value) {
+    if ((this.failWrites && key.startsWith('autoservice_')) || this.failOnKey === key) {
+      throw new Error('QuotaExceededError')
+    }
+    this.data.set(key, String(value))
+  }
+  removeItem(key) { this.data.delete(key) }
+}
+
+const storage = new LocalStorageMock()
+globalThis.localStorage = storage
+let csvBlob
+globalThis.document = {
+  body: { appendChild() {}, removeChild() {} },
+  createElement: () => ({ download: '', style: {}, setAttribute() {}, click() {} })
+}
+URL.createObjectURL = (blob) => { csvBlob = blob; return 'blob:test' }
+
+const compiled = await build({
+  stdin: {
+    contents: [
+      "export { useAutoService } from './src/composables/useAutoService.js'",
+      "export { useOrdenes } from './src/composables/useOrdenes.js'",
+      "export { useReports } from './src/composables/useReports.js'",
+      "export { useNotifications } from './src/composables/useNotifications.js'",
+      "export { default as OrdenesView } from './src/views/OrdenesMantenimiento.vue'",
+      "export { createSSRApp, h } from 'vue'",
+      "export { renderToString } from '@vue/server-renderer'",
+      "export { createRouter, createMemoryHistory } from 'vue-router'",
+      "export * from './src/composables/useDataRecovery.js'",
+      "export * from './src/composables/useFechaActual.js'",
+      "export * from './src/utils/dates.js'"
+    ].join('\n'),
+    resolveDir: process.cwd()
+  },
+  bundle: true, format: 'esm', platform: 'node', write: false,
+  define: { 'import.meta.env.VITE_GOOGLE_CLIENT_ID': '"test-client-id"' },
+  plugins: [{
+    name: 'order-form-script',
+    setup(builder) {
+      builder.onLoad({ filter: /\.vue$/ }, ({ path }) => {
+        if (!path.endsWith('OrdenesMantenimiento.vue')) return { contents: 'export default {}', loader: 'js' }
+        const { descriptor } = parse(readFileSync(path, 'utf8'))
+        return { contents: compileScript(descriptor, { id: 'order-form-regression' }).content, loader: 'js' }
+      })
+    }
+  }]
+})
+const codeUrl = `data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].contents).toString('base64')}`
+let loadCount = 0
+const load = async () => {
+  // Cargar Vue en modo servidor. El documento simulado se usa solamente para CSV.
+  const csvDocument = globalThis.document
+  delete globalThis.document
+  try { return await import(`${codeUrl}#load-${loadCount++}`) }
+  finally { globalThis.document = csvDocument }
+}
+const settle = () => new Promise(resolve => setTimeout(resolve, 20))
+const snapshotSettled = () => new Promise(resolve => setTimeout(resolve, 800))
+const current = (app) => ({
+  clientes: app.clientes.value, vehiculos: app.vehiculos.value,
+  servicios: app.servicios.value, ordenes: app.ordenes.value
+})
+const check = async (name, fn) => {
+  await fn()
+  process.stdout.write(`✓ ${name}\n`)
+}
+
+try {
+  let mod = await load()
+  let app = mod.useAutoService()
+  await app.inicializacionDatos
+  app.agregarCliente({ nombre: 'Cliente inicial', email: 'inicial@example.com' })
+  await snapshotSettled()
+
+  await check('recupera cambios guardados en IndexedDB si localStorage falló y conserva datos anteriores válidos', async () => {
+    const revisionAnterior = storage.getItem(mod.CLAVE_REVISION_DATOS)
+    storage.failWrites = true
+    app.agregarCliente({ nombre: 'Cliente protegido por copia', email: 'recuperar@example.com' })
+    await snapshotSettled()
+    assert.equal(JSON.parse(storage.getItem('autoservice_clientes')).length, 1)
+    assert.equal(storage.getItem(mod.CLAVE_REVISION_DATOS), revisionAnterior)
+    assert.equal((await mod.obtenerUltimoSnapshotValido()).datos.clientes.length, 2)
+    assert.equal(mod.useDataRecovery().estadoRecuperacion.value, 'advertencia')
+    // La recuperación debe servir también mientras el fallo de escritura persiste.
+    const unavailable = await load()
+    const unavailableApp = unavailable.useAutoService()
+    const recovery = await unavailableApp.inicializacionDatos
+    assert.equal(recovery.recuperado, true)
+    assert.equal(recovery.guardadoPrincipalDisponible, false)
+    assert.equal(unavailableApp.clientes.value.length, 2)
+    storage.failWrites = false
+    mod = await load()
+    app = mod.useAutoService()
+    assert.equal(app.datosListos.value, false)
+    assert.equal((await app.inicializacionDatos).recuperado, true)
+    assert.equal(app.clientes.value.length, 2)
+    assert.equal(JSON.parse(storage.getItem('autoservice_clientes')).length, 2)
+  })
+
+  await check('un respaldo anterior no reemplaza cambios más recientes del guardado principal', async () => {
+    await new Promise(resolve => setTimeout(resolve, 150))
+    app.agregarCliente({ nombre: 'Más reciente', email: 'reciente@example.com' })
+    await settle()
+    // Recargar antes de que transcurran los 700 ms de la copia automática.
+    mod = await load()
+    app = mod.useAutoService()
+    assert.equal((await app.inicializacionDatos).recuperado, false)
+    assert.equal(app.clientes.value.length, 3)
+    await snapshotSettled()
+  })
+
+  await check('un respaldo manual no informa un fallo inexistente cuando localStorage contiene los mismos datos', async () => {
+    await mod.crearSnapshotRecuperacion(current(app), 'manual')
+    assert.equal(mod.useDataRecovery().estadoRecuperacion.value, 'protegido')
+  })
+
+  await check('una restauración manual y una eliminación prevalecen sobre copias antiguas', async () => {
+    app.reemplazarDatos({ clientes: [{ id: 100, nombre: 'Restaurado manualmente' }], vehiculos: [], servicios: [], ordenes: [] })
+    await settle()
+    mod = await load()
+    app = mod.useAutoService()
+    await app.inicializacionDatos
+    assert.equal(app.clientes.value.length, 1)
+    assert.equal(app.clientes.value[0].nombre, 'Restaurado manualmente')
+    await snapshotSettled()
+    app.eliminarCliente(100)
+    await settle()
+    mod = await load()
+    app = mod.useAutoService()
+    await app.inicializacionDatos
+    assert.equal(app.clientes.value.length, 0)
+    await snapshotSettled()
+  })
+
+  await check('una escritura parcial revierte colecciones y revisión juntas', async () => {
+    const antes = JSON.parse(JSON.stringify(current(app)))
+    const revision = storage.getItem(mod.CLAVE_REVISION_DATOS)
+    storage.failOnKey = 'autoservice_servicios'
+    assert.throws(() => app.reemplazarDatos({ clientes: [{ id: 200, nombre: 'No debe aplicarse' }], vehiculos: [], servicios: [], ordenes: [] }))
+    storage.failOnKey = null
+    assert.deepEqual(current(app), antes)
+    assert.deepEqual(JSON.parse(storage.getItem('autoservice_clientes')), antes.clientes)
+    assert.equal(storage.getItem(mod.CLAVE_REVISION_DATOS), revision)
+  })
+
+  await check('fechas de calendario y filtros mantienen el día en Argentina, UTC y una zona con horario de verano', async () => {
+    const tzOriginal = process.env.TZ
+    try {
+      for (const tz of ['America/Argentina/Buenos_Aires', 'UTC', 'America/New_York']) {
+        process.env.TZ = tz
+        assert.equal(mod.formatearFecha('2026-10-06'), '06/10/2026')
+        assert.equal(mod.fechaParaInput(new Date(2026, 9, 6, 23, 59)), '2026-10-06')
+        assert.equal(mod.diasHastaFecha('2026-03-09', '2026-03-08'), 1)
+        assert.equal(mod.estaFechaVencida('2026-10-06', new Date(2026, 9, 6, 23, 59)), false)
+        assert.equal(mod.estaFechaVencida('2026-10-05', '2026-10-06'), true)
+        assert.equal(mod.sumarAnos('2024-02-29'), '2025-02-28')
+        assert.equal(mod.sumarAnos('2026-10-06'), '2027-10-06')
+        assert.equal(mod.fechaParaInput('2026-02-30'), '')
+      }
+    } finally {
+      if (tzOriginal === undefined) delete process.env.TZ
+      else process.env.TZ = tzOriginal
+    }
+  })
+
+  process.env.TZ = 'America/Argentina/Buenos_Aires'
+  const client = app.agregarCliente({ nombre: 'Cliente fechas', email: 'fechas@example.com' })
+  const car = app.agregarVehiculo({ clienteId: client.id, marca: 'Ford', modelo: 'Focus', patente: 'AB123CD' })
+  const service = app.agregarServicio({
+    clienteId: client.id, vehiculoId: car.id, tipoServicio: 'General',
+    fechaServicio: '2026-10-06', proximoServicio: '2026-10-06', costo: 1000, estado: 'completado'
+  })
+  const orders = mod.useOrdenes()
+  const reports = mod.useReports()
+  const order = orders.crearOrden({
+    clienteId: client.id, vehiculoId: car.id,
+    descripcionTrabajo: 'Prueba de imágenes y vencimiento', fechaVencimiento: '2026-10-06'
+  })
+
+  await check('las fechas guardadas se conservan al editar y al cambiar el día', async () => {
+    const creation = service.fechaCreacion
+    app.actualizarServicio(service.id, { descripcion: 'Edición', fechaCreacion: '2027-01-01T12:00:00Z' })
+    mod.useFechaActual().fechaActual.value = '2026-10-06'
+    assert.equal(orders.ordenesVencidas.value.length, 0)
+    assert.equal(orders.ordenesProximasVencer.value.length, 1)
+    assert.equal(app.estadisticas.value.ordenesVencidas, 0)
+    assert.equal(app.vehiculosConAlertas.value[0].alerta.dias, 0)
+    mod.useFechaActual().fechaActual.value = '2026-10-07'
+    assert.equal(orders.ordenesVencidas.value.length, 1)
+    assert.equal(orders.ordenesProximasVencer.value.length, 0)
+    assert.equal(app.estadisticas.value.ordenesVencidas, 1)
+    assert.equal(app.vehiculosConAlertas.value[0].alerta.tipo, 'vencido')
+    assert.equal(app.servicios.value[0].fechaServicio, '2026-10-06')
+    assert.equal(app.servicios.value[0].fechaCreacion, creation)
+    orders.cambiarEstadoOrden(order.id, 'cancelada')
+    assert.equal(orders.ordenesVencidas.value.length, 0)
+    assert.equal(app.estadisticas.value.ordenesVencidas, 0)
+  })
+
+  await check('reportes incluyen el primer y último día del mes y exportan las fechas sin desfase', async () => {
+    for (const date of ['2026-10-01', '2026-10-31', '2026-11-01', '2026-10-31T23:30:00-03:00']) {
+      app.agregarServicio({ clienteId: client.id, vehiculoId: car.id, tipoServicio: 'Límite mensual', fechaServicio: date, costo: 1 })
+    }
+    assert.equal(reports.getServiciosPorPeriodo('2026-10-01', '2026-10-31').length, 4)
+    assert.equal(reports.getEstadisticasAnuales(2026)[9].cantidadServicios, 4)
+    assert.equal(reports.getEstadisticasAnuales(2026)[10].cantidadServicios, 1)
+    assert.equal(app.estadisticas.value.serviciosEstesMes, 4)
+    reports.exportarServicios('2026-10-06', '2026-10-06')
+    assert.match(await csvBlob.text(), /06\/10\/2026/)
+    assert.doesNotMatch(await csvBlob.text(), /05\/10\/2026/)
+  })
+
+  await check('agregar y eliminar imágenes no lanzan errores y conservan los adjuntos al recargar', async () => {
+    assert.ok(orders.agregarImagenAOrden(order.id, { fileId: 'foto-a', nombre: 'Motor' }))
+    assert.ok(orders.agregarImagenAOrden(order.id, { fileId: 'foto-b', nombre: 'Repuesto' }))
+    assert.ok(orders.eliminarImagenDeOrden(order.id, 'foto-a'))
+    assert.deepEqual(orders.obtenerImagenesDeOrden(order.id).map(img => img.fileId), ['foto-b'])
+    await settle()
+    mod = await load()
+    app = mod.useAutoService()
+    await app.inicializacionDatos
+    assert.deepEqual(mod.useOrdenes().obtenerImagenesDeOrden(order.id).map(img => img.fileId), ['foto-b'])
+  })
+
+  await check('reportes y exportación de clientes suman solo trabajos completados, incluso con importes como texto', async () => {
+    const before = JSON.parse(JSON.stringify(current(app)))
+    try {
+      app.reemplazarDatos({ ...before, servicios: [
+        { id: 901, clienteId: client.id, vehiculoId: car.id, tipoServicio: 'General', fechaServicio: '2026-10-06', estado: 'completado', costo: '1250' },
+        { id: 902, clienteId: client.id, vehiculoId: car.id, tipoServicio: 'General', fechaServicio: '2026-10-06', estado: 'completado', costo: 750 },
+        ...['pendiente', 'en_progreso', 'cancelado'].map((estado, i) => ({ id: 903 + i, clienteId: client.id, vehiculoId: car.id, tipoServicio: 'General', fechaServicio: '2026-10-06', estado, costo: 99999 }))
+      ] })
+      const financial = mod.useReports()
+      const result = financial.getIngresosPorPeriodo('2026-10-01', '2026-10-31')
+      assert.equal(result.totalIngresos, 2000)
+      assert.equal(result.cantidadServicios, 2)
+      assert.deepEqual(result.ingresosPorTipo.General, { cantidad: 2, total: 2000 })
+      assert.equal(financial.getEstadisticasAnuales(2026)[9].ingresos, 2000)
+      assert.equal(financial.getEstadisticasAnuales(2026)[9].cantidadServicios, 5)
+      assert.equal(financial.getClientesFrecuentes()[0].totalGastado, 2000)
+      financial.exportarClientes()
+      assert.match(await csvBlob.text(), /Total de trabajos realizados/)
+      assert.doesNotMatch(await csvBlob.text(), /99999/)
+      app.reemplazarDatos({ ...before, servicios: [] })
+      assert.equal(financial.getIngresosPorPeriodo('2026-10-01', '2026-10-31').totalIngresos, 0)
+    } finally { app.reemplazarDatos(before) }
+  })
+
+  await check('guardar el formulario de una orden conserva fotos nuevas y no resucita fotos eliminadas', async () => {
+    let form
+    const screen = mod.createSSRApp({
+      setup() {
+        form = mod.OrdenesView.setup({}, { expose() {} })
+        return () => mod.h('div')
+      }
+    })
+    screen.use(mod.createRouter({ history: mod.createMemoryHistory('/'), routes: [{ path: '/', component: {} }] }))
+    await mod.renderToString(screen)
+    const activeOrders = mod.useOrdenes()
+    form.editarOrden(activeOrders.ordenesCompletas.value.find(item => item.id === order.id))
+    form.handleImagenSubida({ fileId: 'foto-c', nombre: 'Nueva foto' })
+    form.handleImagenEliminada({ fileId: 'foto-b' })
+    form.formulario.value.descripcionTrabajo = 'Trabajo actualizado'
+    form.guardarOrden()
+    assert.deepEqual(activeOrders.obtenerImagenesDeOrden(order.id).map(img => img.fileId), ['foto-c'])
+    assert.equal(app.ordenes.value.find(item => item.id === order.id).descripcionTrabajo, 'Trabajo actualizado')
+
+    // Fallo posterior a generar el HTML: antes el catch confundía el error
+    // capturado con la función que muestra el aviso y lanzaba un TypeError.
+    const originalWindow = globalThis.window
+    globalThis.window = { open: () => ({ document: { write() {}, close() {} }, focus() {} }) }
+    const notifications = mod.useNotifications()
+    const htmlOrder = { ...activeOrders.ordenesCompletas.value.find(item => item.id === order.id) }
+    Object.defineProperty(form.googleDriveEnabled, 'value', { get() { throw new Error('Fallo simulado después de generar el documento') }, configurable: true })
+    const originalConsoleError = console.error
+    const loggedErrors = []
+    console.error = (...args) => loggedErrors.push(args)
+    try {
+      await assert.doesNotReject(() => form.generarYSubirPDF(htmlOrder))
+      assert.ok(notifications.notifications.value.some(item => item.type === 'error' && item.message.includes('No se pudo generar o subir')))
+      assert.equal(loggedErrors.length, 1)
+    } finally {
+      console.error = originalConsoleError
+      if (originalWindow === undefined) delete globalThis.window
+      else globalThis.window = originalWindow
+    }
+  })
+
+  await snapshotSettled()
+  await check('migra datos y copias de la versión anterior sin reemplazar el guardado principal válido', async () => {
+    globalThis.indexedDB = new IDBFactory()
+    const legacyStorage = new LocalStorageMock()
+    globalThis.localStorage = legacyStorage
+    const legacyData = { clientes: [{ id: 10, nombre: 'Versión actual del cliente' }], vehiculos: [], servicios: [], ordenes: [] }
+    for (const [collection, values] of Object.entries(legacyData)) {
+      legacyStorage.setItem(`autoservice_${collection}`, JSON.stringify(values))
+    }
+    // Copia producida antes de incorporar las revisiones de guardado.
+    await new Promise((resolve, reject) => {
+      const request = indexedDB.open('autoservice-recovery', 1)
+      request.onupgradeneeded = () => {
+        const store = request.result.createObjectStore('snapshots', { keyPath: 'id', autoIncrement: true })
+        store.createIndex('fecha', 'fecha')
+      }
+      request.onerror = () => reject(request.error)
+      request.onsuccess = () => {
+        const db = request.result
+        const transaction = db.transaction('snapshots', 'readwrite')
+        transaction.objectStore('snapshots').add({
+          fecha: '2026-01-01T12:00:00Z', version: '1.0',
+          datos: { ...legacyData, clientes: [{ id: 10, nombre: 'Versión anterior del cliente' }] }
+        })
+        transaction.oncomplete = () => { db.close(); resolve() }
+        transaction.onerror = () => reject(transaction.error)
+      }
+    })
+    const legacy = await load()
+    const legacyApp = legacy.useAutoService()
+    assert.equal((await legacyApp.inicializacionDatos).recuperado, false)
+    assert.equal(legacyApp.clientes.value[0].nombre, 'Versión actual del cliente')
+    assert.ok(Number(legacyStorage.getItem(legacy.CLAVE_REVISION_DATOS)) > 0)
+    await new Promise(resolve => setTimeout(resolve, 150))
+  })
+
+  await check('IndexedDB no disponible no impide cargar un guardado principal válido', async () => {
+    globalThis.indexedDB = undefined
+    const noDB = await load()
+    const noDBApp = noDB.useAutoService()
+    assert.equal((await noDBApp.inicializacionDatos).recuperado, false)
+    assert.equal(noDBApp.clientes.value[0].nombre, 'Versión actual del cliente')
+    await new Promise(resolve => setTimeout(resolve, 150))
+    assert.equal(noDB.useDataRecovery().estadoRecuperacion.value, 'advertencia')
+  })
+
+  process.stdout.write('Functional regression tests: OK\n')
+  process.exit(0)
+} catch (err) {
+  console.error(`${err.name}: ${err.message}`)
+  process.exit(1)
+}

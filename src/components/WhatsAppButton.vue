@@ -205,6 +205,7 @@ import {
   Calendar 
 } from 'lucide-vue-next'
 import { useWhatsApp } from '../composables/useWhatsApp'
+import { formatearFecha } from '../utils/dates'
 
 const props = defineProps({
   cliente: {
@@ -436,12 +437,12 @@ const handleRecordatorioService = () => {
 
 Tu ${props.vehiculo?.marca} ${props.vehiculo?.modelo} está próximo al service de ${parseInt(campos.kilometraje)?.toLocaleString() || campos.kilometraje}km.
 
-${campos.fechaSugerida ? `📅 Fecha sugerida: ${new Date(campos.fechaSugerida).toLocaleDateString('es-ES')}` : '📅 ¿Coordinamos una fecha?'}
+${campos.fechaSugerida ? `📅 Fecha sugerida: ${formatearFecha(campos.fechaSugerida)}` : '📅 ¿Coordinamos una fecha?'}
 
 *Turnos disponibles esta semana*`
     },
     accion: (campos) => {
-      const fecha = campos.fechaSugerida ? new Date(campos.fechaSugerida).toLocaleDateString('es-ES') : ''
+      const fecha = campos.fechaSugerida ? formatearFecha(campos.fechaSugerida) : ''
       recordatorioProximoService(props.cliente, props.vehiculo, parseInt(campos.kilometraje), fecha)
     }
   })

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { build } from 'esbuild'
+import { readFileSync } from 'node:fs'
 import 'fake-indexeddb/auto'
 
 class LocalStorageMock {
@@ -143,6 +144,14 @@ try {
   assert.equal(await backup.crearBackup(false), true)
   assert.match(downloads[4], /^backup-autoservice-completo-.+\.json$/)
   assert.ok(backup.ultimoBackup.value)
+
+  const fixture = readFileSync(new URL('./fixtures/qa-backup.json', import.meta.url), 'utf8')
+  assert.equal(await backup.restaurarBackup({ content: fixture }), true)
+  assert.equal(datos.clientes.value[0].nombre, 'Cliente restaurado QA')
+  assert.equal(datos.vehiculos.value[0].clienteId, datos.clientes.value[0].id)
+  assert.equal(datos.servicios.value[0].fechaServicio, '2026-10-06')
+  assert.equal(datos.ordenes.value[0].imagenes[0].fileId, 'foto-qa-no-remota')
+  assert.equal(JSON.parse(localStorage.getItem('autoservice_ordenes'))[0].imagenes.length, 1)
 
   const restaurado = {
     version: '1.0',

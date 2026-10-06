@@ -31,7 +31,8 @@
 
     <!-- Main Content -->
     <main class="max-w-7xl mx-auto py-6 px-4">
-      <router-view />
+      <router-view v-if="datosListos" />
+      <p v-else role="status" class="text-gray-600">Cargando datos del taller…</p>
     </main>
     
     <!-- Notifications -->
@@ -44,18 +45,24 @@
 </template>
 
 <script setup>
-import { onMounted, inject } from 'vue'
+import { onMounted, onUnmounted, inject } from 'vue'
 import { Car, BarChart3, Users, Wrench, FileText, Settings, ClipboardList, HelpCircle } from 'lucide-vue-next'
 import NotificationContainer from './components/NotificationContainer.vue'
 import WhatsAppFloatingButton from './components/WhatsAppFloatingButton.vue'
+import { useAutoService } from './composables/useAutoService'
+import { iniciarRelojCalendario, detenerRelojCalendario } from './composables/useFechaActual'
+
+const { datosListos } = useAutoService()
 
 // Iniciar backup automático
 const startBackup = inject('startBackup')
 onMounted(() => {
+  iniciarRelojCalendario()
   if (startBackup) {
     startBackup()
   }
 })
+onUnmounted(detenerRelojCalendario)
 
 const navigation = [
   { name: 'Dashboard', path: '/dashboard', label: 'Dashboard', icon: BarChart3 },

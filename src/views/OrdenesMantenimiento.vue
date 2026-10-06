@@ -144,15 +144,15 @@
                   {{ formatearPrioridad(orden.prioridad) }}
                 </span>
               </td>
-              <td>{{ new Date(orden.fechaCreacion).toLocaleDateString('es-ES') }}</td>
+              <td>{{ formatearFecha(orden.fechaCreacion) }}</td>
               <td>
                 <span 
                   :class="[
                     'text-sm',
-                    orden.fechaVencimiento && new Date(orden.fechaVencimiento) < new Date() && orden.estado !== 'completada' ? 'text-red-600 font-semibold' : 'text-gray-900'
+                    estaFechaVencida(orden.fechaVencimiento, fechaActual) && !['completada', 'cancelada'].includes(orden.estado) ? 'text-red-600 font-semibold' : 'text-gray-900'
                   ]"
                 >
-                  {{ orden.fechaVencimiento ? new Date(orden.fechaVencimiento).toLocaleDateString('es-ES') : 'Sin fecha' }}
+                  {{ orden.fechaVencimiento ? formatearFecha(orden.fechaVencimiento) : 'Sin fecha' }}
                 </span>
               </td>
               <td>${{ orden.costoEstimado?.toLocaleString() || 'Sin presupuesto' }}</td>
@@ -439,6 +439,10 @@ import { useAutoService } from '../composables/useAutoService'
 import { usePDF } from '../composables/usePDF'
 import { useGoogleDrive } from '../composables/useGoogleDrive'
 import { useNotifications } from '../composables/useNotifications'
+import { estaFechaVencida, formatearFecha, fechaParaInput } from '../utils/dates'
+import { useFechaActual } from '../composables/useFechaActual'
+
+const { fechaActual } = useFechaActual()
 
 const {
   ordenesCompletas,
@@ -588,7 +592,7 @@ const editarOrden = (orden) => {
     ...orden,
     vehiculoId: orden.vehiculoId.toString(),
     clienteId: orden.clienteId.toString(),
-    fechaVencimiento: orden.fechaVencimiento ? orden.fechaVencimiento.split('T')[0] : '',
+    fechaVencimiento: orden.fechaVencimiento ? fechaParaInput(orden.fechaVencimiento) : '',
     costoEstimado: orden.costoEstimado || ''
   }
   mostrarFormulario.value = true
@@ -596,7 +600,12 @@ const editarOrden = (orden) => {
 
 const guardarOrden = () => {
   const datosOrden = {
-    ...formulario.value,
+    // Las fotos se guardan mediante sus propios eventos. El formulario no debe
+    // reenviar una lista antigua de imágenes al actualizar la orden.
+    estado: formulario.value.estado,
+    prioridad: formulario.value.prioridad,
+    descripcionTrabajo: formulario.value.descripcionTrabajo,
+    observaciones: formulario.value.observaciones,
     vehiculoId: parseInt(formulario.value.vehiculoId),
     clienteId: parseInt(formulario.value.clienteId),
     costoEstimado: formulario.value.costoEstimado ? parseFloat(formulario.value.costoEstimado) : 0,
@@ -722,9 +731,9 @@ const generarYSubirPDF = async (orden) => {
         success(`PDF de orden ${orden.numeroOrden} generado correctamente`)
       }
     }
-  } catch (error) {
-    console.error('Error al generar PDF:', error)
-    error('Error al generar el PDF')
+  } catch (err) {
+    console.error('Error al generar o subir el documento de la orden:', err)
+    error('No se pudo generar o subir el documento de la orden. Intentá nuevamente.')
   }
 }
 

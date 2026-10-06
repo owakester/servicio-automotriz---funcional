@@ -6,7 +6,11 @@ import {
   obtenerUltimoSnapshotValido,
   marcarRecuperacionExitosa,
   marcarDatosProtegidos,
-  marcarAdvertenciaRecuperacion
+  marcarAdvertenciaRecuperacion,
+  CLAVE_REVISION_DATOS,
+  crearRevisionDatos,
+  leerRevisionDatosLocales,
+  registrarRevisionDatos
 } from './useDataRecovery'
 import {
   crearIdUnico,
@@ -16,6 +20,8 @@ import {
   normalizarEmail,
   normalizarPatente
 } from '../utils/dataIntegrity'
+import { diasHastaFecha, estaFechaVencida, inicioDelDia, parsearFechaLocal } from '../utils/dates'
+import { useFechaActual } from './useFechaActual'
 
 // Estado global de la aplicación
 const clientes = ref([])
@@ -49,16 +55,18 @@ const aplicarDatosAlEstado = (datos) => {
   ordenes.value = datos.ordenes
 }
 
-const guardarDatosEnLocalStorage = (datos) => {
+const guardarDatosEnLocalStorage = (datos, revision = crearRevisionDatos()) => {
   const valoresAnteriores = {}
 
   try {
     Object.entries(CLAVES_DATOS).forEach(([coleccion, clave]) => {
       valoresAnteriores[coleccion] = localStorage.getItem(clave)
     })
+    valoresAnteriores.revision = localStorage.getItem(CLAVE_REVISION_DATOS)
     Object.entries(CLAVES_DATOS).forEach(([coleccion, clave]) => {
       localStorage.setItem(clave, JSON.stringify(datos[coleccion]))
     })
+    localStorage.setItem(CLAVE_REVISION_DATOS, String(revision))
   } catch (err) {
     try {
       Object.entries(CLAVES_DATOS).forEach(([coleccion, clave]) => {
@@ -67,6 +75,10 @@ const guardarDatosEnLocalStorage = (datos) => {
         if (valorAnterior === null) localStorage.removeItem(clave)
         else localStorage.setItem(clave, valorAnterior)
       })
+      if ('revision' in valoresAnteriores) {
+        if (valoresAnteriores.revision === null) localStorage.removeItem(CLAVE_REVISION_DATOS)
+        else localStorage.setItem(CLAVE_REVISION_DATOS, valoresAnteriores.revision)
+      }
     } catch {
       // Si localStorage está totalmente inaccesible, IndexedDB seguirá protegiendo la sesión.
     }
@@ -76,15 +88,16 @@ const guardarDatosEnLocalStorage = (datos) => {
 
 const persistirDatos = () => {
   const datos = obtenerDatosActuales()
+  const revision = crearRevisionDatos()
   try {
-    guardarDatosEnLocalStorage(datos)
+    guardarDatosEnLocalStorage(datos, revision)
     marcarDatosProtegidos()
   } catch (err) {
     marcarAdvertenciaRecuperacion(`No se pudo guardar en el navegador: ${err.message}`)
   }
 
   // IndexedDB es independiente de localStorage y sirve como copia de recuperación.
-  programarSnapshotRecuperacion(datos)
+  programarSnapshotRecuperacion(datos, 700, revision)
 }
 
 const iniciarPersistencia = () => {
@@ -182,22 +195,36 @@ const inicializarDatos = () => {
   inicializacionIniciada = true
 
   const datosLocales = leerDatosLocales()
-  if (datosLocales.estado === 'valido') {
-    aplicarDatosAlEstado(datosLocales.datos)
-    datosListos.value = true
-    iniciarPersistencia()
-    programarSnapshotRecuperacion(datosLocales.datos, 100)
-    marcarDatosProtegidos()
-    inicializacionDatos = Promise.resolve({ recuperado: false })
-    return inicializacionDatos
-  }
+  const revisionLocal = leerRevisionDatosLocales()
+  registrarRevisionDatos(revisionLocal)
 
   inicializacionDatos = obtenerUltimoSnapshotValido()
     .then((snapshot) => {
+      registrarRevisionDatos(snapshot?.revision || new Date(snapshot?.fecha).getTime())
+      const copiaMasReciente = snapshot && Number(snapshot.revision) > revisionLocal &&
+        JSON.stringify(snapshot.datos) !== JSON.stringify(datosLocales.datos)
+
+      if (datosLocales.estado === 'valido' && !copiaMasReciente) {
+        aplicarDatosAlEstado(datosLocales.datos)
+        let revision = revisionLocal
+        try {
+          // Migrar el almacenamiento anterior sin reemplazarlo por una copia antigua.
+          if (!revision) {
+            revision = crearRevisionDatos()
+            guardarDatosEnLocalStorage(datosLocales.datos, revision)
+          }
+          marcarDatosProtegidos()
+        } catch {
+          marcarAdvertenciaRecuperacion('Los datos están disponibles, pero el navegador no admite escrituras. Crea un backup externo.')
+        }
+        programarSnapshotRecuperacion(datosLocales.datos, 100, revision || crearRevisionDatos())
+        return { recuperado: false }
+      }
+
       if (snapshot) {
         let guardadoPrincipalDisponible = true
         try {
-          guardarDatosEnLocalStorage(snapshot.datos)
+          guardarDatosEnLocalStorage(snapshot.datos, snapshot.revision || crearRevisionDatos())
         } catch {
           guardadoPrincipalDisponible = false
         }
@@ -247,8 +274,19 @@ const inicializarDatos = () => {
   return inicializacionDatos
 }
 
+// La restauración también debe actualizar la revisión: una copia anterior no
+// puede ganar frente a una restauración explícita más reciente.
+const reemplazarDatos = (datos) => {
+  if (!validarDatosAutoservice(datos)) throw new Error('Los datos no tienen relaciones válidas')
+  const revision = crearRevisionDatos()
+  guardarDatosEnLocalStorage(datos, revision)
+  aplicarDatosAlEstado(datos)
+  programarSnapshotRecuperacion(datos, 700, revision)
+}
+
 export const useAutoService = () => {
   const { success, error, warning } = useNotifications()
+  const { fechaActual } = useFechaActual()
   
   // Cargar una sola vez y recuperar la última copia local si fuera necesario.
   const eraPrimeraInicializacion = !inicializacionIniciada
@@ -330,8 +368,8 @@ export const useAutoService = () => {
     // Buscar el servicio correspondiente para obtener el costo final
     const serviciosVehiculo = obtenerServiciosPorVehiculo(orden.vehiculoId)
     const servicioReciente = serviciosVehiculo
-      .filter(s => new Date(s.fechaServicio) >= new Date(orden.fechaCreacion))
-      .sort((a, b) => new Date(b.fechaServicio) - new Date(a.fechaServicio))[0]
+      .filter(s => parsearFechaLocal(s.fechaServicio) >= inicioDelDia(orden.fechaCreacion))
+      .sort((a, b) => parsearFechaLocal(b.fechaServicio) - parsearFechaLocal(a.fechaServicio))[0]
     
     let costoMostrar = 'A convenir'
     if (servicioReciente && servicioReciente.costo) {
@@ -545,6 +583,10 @@ Todo perfecto! ✨
     const index = vehiculos.value.findIndex(v => idsIguales(v.id, id))
     if (index !== -1) {
       const vehiculoCombinado = { ...vehiculos.value[index], ...vehiculoActualizado }
+      if (!idsIguales(vehiculoCombinado.clienteId, vehiculos.value[index].clienteId)) {
+        error('No se puede cambiar el cliente de un vehículo ya registrado')
+        return null
+      }
       const patente = normalizarPatente(vehiculoCombinado.patente)
       if (!vehiculoCombinado.marca?.trim() || !vehiculoCombinado.modelo?.trim()) {
         error('El vehículo necesita marca y modelo')
@@ -562,7 +604,7 @@ Todo perfecto! ✨
         error('El cliente seleccionado no existe')
         return null
       }
-      vehiculos.value[index] = { ...vehiculoCombinado, patente }
+      vehiculos.value[index] = { ...vehiculoCombinado, patente, clienteId: vehiculos.value[index].clienteId }
       success(`Vehículo ${vehiculoActualizado.marca} ${vehiculoActualizado.modelo} actualizado exitosamente`)
       return vehiculos.value[index]
     }
@@ -598,7 +640,7 @@ Todo perfecto! ✨
       error('El servicio necesita un vehículo y un cliente válidos')
       return null
     }
-    if (!servicio.tipoServicio || !servicio.fechaServicio ||
+    if (!servicio.tipoServicio || Number.isNaN(parsearFechaLocal(servicio.fechaServicio).getTime()) ||
         (servicio.costo !== undefined && (!Number.isFinite(Number(servicio.costo)) || Number(servicio.costo) < 0))) {
       error('Revisa el tipo, la fecha y el costo del servicio')
       return null
@@ -625,12 +667,12 @@ Todo perfecto! ✨
         error('El servicio necesita un vehículo y un cliente válidos')
         return null
       }
-      if (!servicioCombinado.tipoServicio || !servicioCombinado.fechaServicio ||
+      if (!servicioCombinado.tipoServicio || Number.isNaN(parsearFechaLocal(servicioCombinado.fechaServicio).getTime()) ||
           (servicioCombinado.costo !== undefined && (!Number.isFinite(Number(servicioCombinado.costo)) || Number(servicioCombinado.costo) < 0))) {
         error('Revisa el tipo, la fecha y el costo del servicio')
         return null
       }
-      servicios.value[index] = servicioCombinado
+      servicios.value[index] = { ...servicioCombinado, fechaCreacion: servicios.value[index].fechaCreacion }
       success(`Servicio ${servicioActualizado.tipoServicio} actualizado exitosamente`)
       return servicios.value[index]
     }
@@ -729,21 +771,20 @@ Todo perfecto! ✨
 
   // Computed para vehículos con alertas de servicio
   const vehiculosConAlertas = computed(() => {
-    const hoy = new Date()
-    hoy.setHours(0, 0, 0, 0) // Resetear horas para comparación exacta
+    const hoy = fechaActual.value
 
     return vehiculos.value.map(vehiculo => {
       const serviciosVehiculo = obtenerServiciosPorVehiculo(vehiculo.id)
       const ultimoServicio = serviciosVehiculo
-        .sort((a, b) => new Date(b.fechaServicio) - new Date(a.fechaServicio))[0]
+        .sort((a, b) => parsearFechaLocal(b.fechaServicio) - parsearFechaLocal(a.fechaServicio))[0]
 
       let alerta = null
       if (ultimoServicio && ultimoServicio.proximoServicio) {
-        // Crear fecha local para evitar problema de zona horaria
-        const fechaProximoServicio = new Date(ultimoServicio.proximoServicio + 'T00:00:00')
-        const diasRestantes = Math.ceil((fechaProximoServicio.getTime() - hoy.getTime()) / (24 * 60 * 60 * 1000))
+        const diasRestantes = diasHastaFecha(ultimoServicio.proximoServicio, hoy)
         
-        if (diasRestantes < 0) {
+        if (diasRestantes === null) {
+          alerta = null
+        } else if (diasRestantes < 0) {
           alerta = { tipo: 'vencido', dias: Math.abs(diasRestantes) }
         } else if (diasRestantes <= 7) {
           alerta = { tipo: 'urgente', dias: diasRestantes }
@@ -763,14 +804,15 @@ Todo perfecto! ✨
 
   // Computed para estadísticas del dashboard
   const estadisticas = computed(() => {
-    const hoy = new Date()
+    const hoy = parsearFechaLocal(fechaActual.value)
     const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1)
+    const finMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1)
     inicioMes.setHours(0, 0, 0, 0)
     
     const serviciosEstesMes = servicios.value.filter(s => {
       // Crear fecha local para evitar problema de zona horaria
-      const fechaServicio = new Date(s.fechaServicio + 'T00:00:00')
-      return fechaServicio >= inicioMes
+      const fechaServicio = parsearFechaLocal(s.fechaServicio)
+      return fechaServicio >= inicioMes && fechaServicio < finMes
     }).length
 
     const alertasVencidas = vehiculosConAlertas.value.filter(v => 
@@ -788,9 +830,7 @@ Todo perfecto! ✨
     const totalOrdenes = ordenes.value.length
     const ordenesPendientes = ordenes.value.filter(o => o.estado === 'pendiente').length
     const ordenesVencidas = ordenes.value.filter(o => {
-      const hoy = new Date()
-      return o.fechaVencimiento && 
-             new Date(o.fechaVencimiento) < hoy && 
+      return estaFechaVencida(o.fechaVencimiento, hoy) &&
              o.estado !== 'completada' && 
              o.estado !== 'cancelada'
     }).length
@@ -817,6 +857,7 @@ Todo perfecto! ✨
     ordenes,
     datosListos,
     inicializacionDatos,
+    reemplazarDatos,
     vehiculosConAlertas,
     estadisticas,
     

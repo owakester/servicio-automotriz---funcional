@@ -5,6 +5,7 @@ ServiceCar está pensado para administrar un taller mecánico pequeño desde una
 ## Antes de empezar
 
 - Usá siempre la misma computadora y el mismo navegador.
+- Abrí siempre `http://localhost:5173`. No cambies a otra dirección o puerto: el navegador guarda los datos por dirección.
 - Mantené una sola pestaña de ServiceCar abierta.
 - No borres los datos del navegador ni trabajes en modo incógnito.
 - Conectá Google Drive o descargá periódicamente una copia externa.
@@ -37,6 +38,8 @@ El programa no permite repetir emails. Un cliente con vehículos asociados no pu
 
 La patente debe tener formato `ABC123` o `AB123CD`. No se permiten patentes repetidas.
 
+El cliente se elige al crear el vehículo y después queda fijo. Al editar podés corregir los datos del automóvil, pero no cambiar el cliente asociado.
+
 ## Crear y actualizar una orden
 
 1. Entrá en **Órdenes** y presioná **Nueva Orden**.
@@ -47,6 +50,8 @@ La patente debe tener formato `ABC123` o `AB123CD`. No se permiten patentes repe
 
 La orden representa el trabajo pendiente o en curso.
 
+El botón de PDF abre un documento para imprimir. Para guardarlo como PDF, usá **Imprimir → Guardar como PDF** en el navegador. Si bloquea la ventana, se descarga el documento HTML para abrirlo e imprimirlo.
+
 ## Registrar un servicio
 
 1. Entrá en **Servicios** y presioná **Nuevo Servicio**.
@@ -56,9 +61,15 @@ La orden representa el trabajo pendiente o en curso.
 
 El servicio representa el trabajo efectivamente realizado y forma parte del historial del vehículo.
 
+## Leer los reportes
+
+En **Reportes**, el «Total de trabajos realizados» suma solamente servicios con estado **Completado**. Los pendientes, en progreso y cancelados no se suman. El programa no registra pagos: ese importe no confirma cuánto se cobró. El listado anual de servicios incluye todos los estados.
+
 ## Copias de seguridad
 
 ServiceCar conserva hasta tres copias locales de recuperación. Estas copias ayudan si se daña el almacenamiento principal del navegador, pero no protegen frente a una pérdida o rotura de la computadora.
+
+Si falla el guardado principal, al volver a abrir el programa se recuperan los cambios de la copia local más reciente. Si aparece una advertencia de guardado, descargá una copia desde Configuración.
 
 Para tener una copia externa:
 

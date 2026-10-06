@@ -5,6 +5,7 @@ import { useGoogleDrive } from './useGoogleDrive'
 import { useReports } from './useReports'
 import { useProximosServicios } from './useProximosServicios'
 import { crearSnapshotRecuperacion, useDataRecovery, validarDatosAutoservice } from './useDataRecovery'
+import { fechaParaInput, formatearFecha } from '../utils/dates'
 
 const leerPreferenciaLocal = (clave, valorPorDefecto = null) => {
   try {
@@ -47,7 +48,7 @@ watch(backupAutomaticoGoogleDrive, (valor) => { guardarPreferenciaLocal('backupA
 
 export const useBackupSystem = () => {
   const { success, error, info, warning } = useNotifications()
-  const { clientes, vehiculos, servicios, ordenes, inicializacionDatos } = useAutoService()
+  const { clientes, vehiculos, servicios, ordenes, inicializacionDatos, reemplazarDatos } = useAutoService()
   const { ultimoSnapshotLocal } = useDataRecovery()
   const { 
     isAuthenticated,
@@ -97,10 +98,7 @@ export const useBackupSystem = () => {
   }
 
   const formatearFechaCSV = (fecha) => {
-    if (!fecha) return ''
-    const valor = /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? `${fecha}T00:00:00` : fecha
-    const fechaNormalizada = new Date(valor)
-    return Number.isNaN(fechaNormalizada.getTime()) ? '' : fechaNormalizada.toLocaleDateString('es-ES')
+    return formatearFecha(fecha)
   }
 
   const descargarBlob = (blob, nombreArchivo) => {
@@ -145,37 +143,14 @@ export const useBackupSystem = () => {
   }
 
   const aplicarDatosRestaurados = (datos) => {
-    const respaldoActual = {
-      clientes: [...clientes.value],
-      vehiculos: [...vehiculos.value],
-      servicios: [...servicios.value],
-      ordenes: [...ordenes.value]
-    }
-
-    try {
-      localStorage.setItem('autoservice_clientes', JSON.stringify(datos.clientes))
-      localStorage.setItem('autoservice_vehiculos', JSON.stringify(datos.vehiculos))
-      localStorage.setItem('autoservice_servicios', JSON.stringify(datos.servicios))
-      localStorage.setItem('autoservice_ordenes', JSON.stringify(datos.ordenes))
-
-      clientes.value = datos.clientes
-      vehiculos.value = datos.vehiculos
-      servicios.value = datos.servicios
-      ordenes.value = datos.ordenes
-    } catch (err) {
-      localStorage.setItem('autoservice_clientes', JSON.stringify(respaldoActual.clientes))
-      localStorage.setItem('autoservice_vehiculos', JSON.stringify(respaldoActual.vehiculos))
-      localStorage.setItem('autoservice_servicios', JSON.stringify(respaldoActual.servicios))
-      localStorage.setItem('autoservice_ordenes', JSON.stringify(respaldoActual.ordenes))
-      throw err
-    }
+    reemplazarDatos(datos)
   }
 
   const generarCSVClientes = (clientesData) => {
     return crearCSV(
-      ['ID', 'Nombre', 'Email', 'Teléfono', 'Dirección', 'Cantidad Servicios', 'Total Gastado', 'Último Servicio', 'Fecha Registro'],
+      ['ID', 'Nombre', 'Email', 'Teléfono', 'Dirección', 'Servicios completados', 'Total de trabajos realizados', 'Último Servicio', 'Fecha Registro'],
       clientesData.map(cliente => {
-        const serviciosCliente = servicios.value.filter(servicio => servicio.clienteId === cliente.id)
+        const serviciosCliente = servicios.value.filter(servicio => String(servicio.clienteId) === String(cliente.id) && servicio.estado === 'completado')
         const ultimoServicio = [...serviciosCliente]
           .sort((a, b) => new Date(b.fechaServicio) - new Date(a.fechaServicio))[0]
         const totalGastado = serviciosCliente.reduce((total, servicio) => total + (Number(servicio.costo) || 0), 0)
@@ -277,7 +252,7 @@ export const useBackupSystem = () => {
       datosIngresos.totalIngresos,
       (datosIngresos.totalIngresos / datosIngresos.cantidadServicios || 0).toFixed(2)
     ])
-    return crearCSV(['Tipo de Servicio', 'Cantidad', 'Total Ingresos', 'Promedio por Servicio'], filas)
+    return crearCSV(['Tipo de Servicio', 'Servicios completados', 'Total de trabajos realizados', 'Promedio por Servicio'], filas)
   }
   
   const generarCSVVehiculosPorMarca = (vehiculosData) => {
@@ -295,7 +270,7 @@ export const useBackupSystem = () => {
   
   const generarCSVEstadisticasAnuales = (estadisticasData) => {
     return crearCSV(
-      ['Mes', 'Cantidad Servicios', 'Ingresos'],
+      ['Mes', 'Cantidad Servicios (todos los estados)', 'Total de trabajos realizados'],
       estadisticasData.map(mes => [mes.mes, mes.cantidadServicios, mes.ingresos])
     )
   }
@@ -306,10 +281,10 @@ export const useBackupSystem = () => {
       reportes.push({ nombre: 'clientes-reporte.csv', contenido: generarCSVClientes(clientes.value), tipo: 'text/csv' })
       reportes.push({ nombre: 'vehiculos-reporte.csv', contenido: generarCSVVehiculos(), tipo: 'text/csv' })
       const fechaHaceUnAno = new Date(); fechaHaceUnAno.setFullYear(fechaHaceUnAno.getFullYear() - 1)
-      const serviciosUltimoAno = getServiciosPorPeriodo(fechaHaceUnAno.toISOString().split('T')[0], new Date().toISOString().split('T')[0])
+      const serviciosUltimoAno = getServiciosPorPeriodo(fechaParaInput(fechaHaceUnAno), fechaParaInput())
       reportes.push({ nombre: 'servicios-ultimo-ano.csv', contenido: generarCSVServicios(serviciosUltimoAno), tipo: 'text/csv' })
       reportes.push({ nombre: 'ordenes-reporte.csv', contenido: generarCSVOrdenes(), tipo: 'text/csv' })
-      const ingresosAno = getIngresosPorPeriodo(fechaHaceUnAno.toISOString().split('T')[0], new Date().toISOString().split('T')[0])
+      const ingresosAno = getIngresosPorPeriodo(fechaParaInput(fechaHaceUnAno), fechaParaInput())
       reportes.push({ nombre: 'ingresos-ultimo-ano.csv', contenido: generarCSVIngresos(ingresosAno), tipo: 'text/csv' })
       reportes.push({ nombre: 'vehiculos-por-marca.csv', contenido: generarCSVVehiculosPorMarca(getVehiculosPorMarca()), tipo: 'text/csv' })
       reportes.push({ nombre: 'estadisticas-anuales.csv', contenido: generarCSVEstadisticasAnuales(getEstadisticasAnuales()), tipo: 'text/csv' })

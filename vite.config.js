@@ -10,11 +10,12 @@ export default defineConfig({
     },
     port: 5173,
     host: true, // Permite acceso desde la red local
-    strictPort: false
+    strictPort: true
     
   },
   preview: {
     port: 4173,
-    host: true
+    host: true,
+    strictPort: true
   }
 })

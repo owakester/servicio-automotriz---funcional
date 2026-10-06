@@ -1,4 +1,5 @@
 import { useNotifications } from './useNotifications'
+import { formatearFecha } from '../utils/dates'
 
 export const usePDF = () => {
   const { success, error } = useNotifications()
@@ -142,7 +143,7 @@ export const usePDF = () => {
             <div class="company-name">AutoService Pro</div>
             <div class="order-number">Orden de Mantenimiento: ${orden.numeroOrden}</div>
             <div style="color: #6b7280; font-size: 14px;">
-              Fecha: ${new Date(orden.fechaCreacion).toLocaleDateString('es-ES')}
+              Fecha: ${formatearFecha(orden.fechaCreacion)}
             </div>
           </div>
 
@@ -207,7 +208,7 @@ export const usePDF = () => {
               </div>
               <div class="info-item">
                 <span class="info-label">Fecha de Vencimiento:</span>
-                <span class="info-value">${orden.fechaVencimiento ? new Date(orden.fechaVencimiento).toLocaleDateString('es-ES') : 'Sin fecha límite'}</span>
+                <span class="info-value">${orden.fechaVencimiento ? formatearFecha(orden.fechaVencimiento) : 'Sin fecha límite'}</span>
               </div>
               <div class="info-item">
                 <span class="info-label">Costo Estimado:</span>

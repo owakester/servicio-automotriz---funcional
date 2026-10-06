@@ -77,7 +77,7 @@
           <div class="text-3xl font-bold text-green-600">
             ${{ datosPeriodo.totalIngresos.toLocaleString() }}
           </div>
-          <div class="text-sm text-gray-600">Ingresos Totales</div>
+          <div class="text-sm text-gray-600">Total de trabajos realizados</div>
         </div>
         <div class="text-center">
           <div class="text-3xl font-bold text-blue-600">
@@ -95,14 +95,15 @@
     </BaseCard>
 
     <!-- Ingresos por Tipo de Servicio -->
-    <BaseCard title="Ingresos por Tipo de Servicio" v-if="hayDatos && datosPeriodo && datosPeriodo.cantidadServicios > 0">
+    <p v-if="hayDatos" class="text-sm text-gray-600">Los importes incluyen solo servicios completados. No representan cobros registrados. El listado anual de servicios incluye todos los estados.</p>
+    <BaseCard title="Trabajos realizados por Tipo de Servicio" v-if="hayDatos && datosPeriodo && datosPeriodo.cantidadServicios > 0">
       <div class="overflow-x-auto">
         <table class="table">
           <thead class="bg-gray-50">
             <tr>
               <th>Tipo de Servicio</th>
               <th>Cantidad</th>
-              <th>Ingresos</th>
+              <th>Importe de trabajos realizados</th>
               <th>Promedio</th>
               <th>% del Total</th>
             </tr>
@@ -113,7 +114,7 @@
               <td>{{ datos.cantidad }}</td>
               <td>${{ datos.total.toLocaleString() }}</td>
               <td>${{ (datos.total / datos.cantidad).toFixed(0) }}</td>
-              <td>{{ ((datos.total / datosPeriodo.totalIngresos) * 100).toFixed(1) }}%</td>
+              <td>{{ (datosPeriodo.totalIngresos > 0 ? (datos.total / datosPeriodo.totalIngresos) * 100 : 0).toFixed(1) }}%</td>
             </tr>
           </tbody>
         </table>
@@ -128,8 +129,8 @@
             <tr>
               <th>Cliente</th>
               <th>Email</th>
-              <th>Servicios</th>
-              <th>Total Gastado</th>
+              <th>Servicios completados</th>
+              <th>Total de trabajos realizados</th>
               <th>Último Servicio</th>
             </tr>
           </thead>
@@ -141,7 +142,7 @@
               <td>${{ cliente.totalGastado.toLocaleString() }}</td>
               <td>
                 {{ cliente.ultimoServicio 
-                  ? new Date(cliente.ultimoServicio.fechaServicio).toLocaleDateString('es-ES')
+                  ? formatearFecha(cliente.ultimoServicio.fechaServicio)
                   : 'N/A' 
                 }}
               </td>
@@ -199,7 +200,7 @@
 
           <!-- Gráfico de Ingresos por Mes -->
           <div>
-            <h4 class="text-lg font-semibold text-gray-900 mb-4">Ingresos por Mes</h4>
+            <h4 class="text-lg font-semibold text-gray-900 mb-4">Trabajos realizados por Mes</h4>
             <div class="space-y-2">
               <div
                 v-for="stat in estadisticasAnuales"
@@ -229,6 +230,7 @@ import { BarChart3, Download } from 'lucide-vue-next'
 import BaseCard from '../components/BaseCard.vue'
 import { useReports } from '../composables/useReports'
 import { useAutoService } from '../composables/useAutoService'
+import { fechaParaInput, formatearFecha } from '../utils/dates'
 
 const {
   getIngresosPorPeriodo,
@@ -278,8 +280,8 @@ const inicializarFiltros = () => {
   const hoy = new Date()
   const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1)
   
-  filtros.value.fechaInicio = inicioMes.toISOString().split('T')[0]
-  filtros.value.fechaFin = hoy.toISOString().split('T')[0]
+  filtros.value.fechaInicio = fechaParaInput(inicioMes)
+  filtros.value.fechaFin = fechaParaInput(hoy)
   
   aplicarFiltros()
 }

@@ -145,14 +145,14 @@
             <div class="flex justify-between items-center">
               <span class="text-sm font-medium text-gray-700">Último servicio:</span>
               <span class="text-sm text-gray-600">
-                {{ new Date(vehiculo.ultimoServicio.fechaServicio).toLocaleDateString('es-ES') }}
+                {{ formatearFecha(vehiculo.ultimoServicio.fechaServicio) }}
               </span>
             </div>
             <div class="text-sm text-gray-600">
               {{ vehiculo.ultimoServicio.tipoServicio }}
             </div>
             <div v-if="vehiculo.ultimoServicio.proximoServicio" class="text-sm text-gray-600">
-              Próximo: {{ new Date(vehiculo.ultimoServicio.proximoServicio).toLocaleDateString('es-ES') }}
+              Próximo: {{ formatearFecha(vehiculo.ultimoServicio.proximoServicio) }}
             </div>
           </div>
           <div v-else class="text-sm text-gray-500 italic">
@@ -227,6 +227,7 @@
               Cliente *
             </label>
             <select
+              v-if="!vehiculoEditando"
               v-model="formulario.clienteId"
               id="vehicle-client"
               autofocus
@@ -238,6 +239,18 @@
                 {{ cliente.nombre }}
               </option>
             </select>
+            <input
+              v-else
+              id="vehicle-client"
+              type="text"
+              :value="nombreClienteRegistrado"
+              readonly
+              aria-describedby="vehicle-client-help"
+              class="input-field bg-gray-50"
+            />
+            <p v-if="vehiculoEditando" id="vehicle-client-help" class="mt-1 text-sm text-gray-500">
+              El cliente se asigna al registrar el vehículo y no se puede cambiar.
+            </p>
           </div>
 
           <div>
@@ -419,6 +432,7 @@ import {
 import { useAutoService } from '../composables/useAutoService'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import { useNotifications } from '../composables/useNotifications'
+import { formatearFecha } from '../utils/dates'
 
 const router = useRouter()
 const route = useRoute()
@@ -461,6 +475,10 @@ const formulario = ref({
 })
 
 // Computed
+const nombreClienteRegistrado = computed(() =>
+  clientes.value.find(cliente => String(cliente.id) === String(vehiculoEditando.value?.clienteId))?.nombre || 'Cliente no encontrado'
+)
+
 const vehiculosFiltrados = computed(() => {
   let resultado = vehiculosConAlertas.value
   
@@ -532,7 +550,7 @@ const guardarVehiculo = () => {
     patente: formulario.value.patente.toUpperCase(),
     anio: parseInt(formulario.value.anio),
     kilometraje: formulario.value.kilometraje ? parseInt(formulario.value.kilometraje) : 0,
-    clienteId: parseInt(formulario.value.clienteId)
+    clienteId: vehiculoEditando.value ? vehiculoEditando.value.clienteId : parseInt(formulario.value.clienteId)
   }
 
   const resultado = vehiculoEditando.value

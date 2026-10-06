@@ -316,6 +316,10 @@ import { useOrdenes } from '../composables/useOrdenes'
 import { useMemoize } from '../composables/useOptimization'
 import { usePerformanceMonitor } from '../composables/usePerformanceMonitor'
 import { useSmartCache } from '../composables/useSmartCache'
+import { diasHastaFecha, formatearFecha, parsearFechaLocal } from '../utils/dates'
+import { useFechaActual } from '../composables/useFechaActual'
+
+const { fechaActual } = useFechaActual()
 
 const { 
   vehiculosConAlertas, 
@@ -336,32 +340,8 @@ const { ordenesVencidas } = useOrdenes()
 const { measureComponentRender, detectExcessiveRerenders } = usePerformanceMonitor()
 const { getOrFetch } = useSmartCache()
 
-// FUNCIONES PARA CORREGIR EL PROBLEMA DE FECHAS
-const formatearFecha = (fecha) => {
-  if (!fecha) return ''
-  
-  // Crear fecha local para evitar problema de zona horaria
-  const fechaLocal = new Date(fecha + 'T00:00:00')
-  
-  return fechaLocal.toLocaleDateString('es-ES', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  })
-}
-
 const calcularDiasRestantes = (fechaProximoServicio) => {
-  if (!fechaProximoServicio) return null
-  
-  const hoy = new Date()
-  hoy.setHours(0, 0, 0, 0) // Resetear horas para comparación exacta
-  
-  const fechaServicio = new Date(fechaProximoServicio + 'T00:00:00')
-  
-  const diferenciaTiempo = fechaServicio.getTime() - hoy.getTime()
-  const diferenciaDias = Math.ceil(diferenciaTiempo / (1000 * 3600 * 24))
-  
-  return diferenciaDias
+  return diasHastaFecha(fechaProximoServicio, fechaActual.value)
 }
 
 const formatearDiasRestantes = (fechaProximoServicio) => {
@@ -410,7 +390,7 @@ const serviciosRecientes = useMemoize(() => {
   checkRerenders() // Verificar re-renders
   
   return [...servicios.value]
-    .sort((a, b) => new Date(b.fechaServicio) - new Date(a.fechaServicio))
+    .sort((a, b) => parsearFechaLocal(b.fechaServicio) - parsearFechaLocal(a.fechaServicio))
     .slice(0, 5)
     .map(servicio => ({
       ...servicio,

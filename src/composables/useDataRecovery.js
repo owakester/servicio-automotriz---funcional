@@ -6,6 +6,28 @@ const DB_VERSION = 1
 const STORE_NAME = 'snapshots'
 const MAX_SNAPSHOTS = 3
 const LAST_SNAPSHOT_KEY = 'autoservice_last_local_snapshot'
+export const CLAVE_REVISION_DATOS = 'autoservice_revision_datos'
+let ultimaRevision = 0
+
+export const registrarRevisionDatos = (revision) => {
+  const valor = Number(revision)
+  if (Number.isSafeInteger(valor) && valor > 0) ultimaRevision = Math.max(ultimaRevision, valor)
+}
+
+export const leerRevisionDatosLocales = () => {
+  try {
+    const revision = Number(localStorage.getItem(CLAVE_REVISION_DATOS))
+    return Number.isSafeInteger(revision) && revision > 0 ? revision : 0
+  } catch {
+    return 0
+  }
+}
+
+export const crearRevisionDatos = () => {
+  registrarRevisionDatos(leerRevisionDatosLocales())
+  ultimaRevision = Math.max(Date.now(), ultimaRevision + 1)
+  return ultimaRevision
+}
 
 const leerUltimoSnapshotGuardado = () => {
   try {
@@ -23,6 +45,29 @@ const datosRecuperados = ref(false)
 let dbPromise = null
 let snapshotTimer = null
 let snapshotPendiente = null
+let colaSnapshots = Promise.resolve()
+
+const compararSnapshots = (a, b) =>
+  (Number(b.revision) || new Date(b.fecha).getTime()) -
+  (Number(a.revision) || new Date(a.fecha).getTime()) || (b.id || 0) - (a.id || 0)
+
+const informarSnapshotDisponible = (revision, mensaje, datos) => {
+  let coincideConGuardadoPrincipal = false
+  try {
+    const datosLocales = Object.fromEntries(['clientes', 'vehiculos', 'servicios', 'ordenes'].map(
+      (coleccion) => [coleccion, JSON.parse(localStorage.getItem(`autoservice_${coleccion}`))]
+    ))
+    coincideConGuardadoPrincipal = JSON.stringify(datosLocales) === JSON.stringify(datos)
+  } catch { /* La copia de recuperación permanece disponible aunque el guardado principal falle. */ }
+
+  if (leerRevisionDatosLocales() < revision && !coincideConGuardadoPrincipal) {
+    estadoRecuperacion.value = 'advertencia'
+    mensajeRecuperacion.value = 'La copia de recuperación conserva los últimos cambios, pero el guardado principal no pudo actualizarse. Crea un backup externo.'
+  } else {
+    estadoRecuperacion.value = 'protegido'
+    mensajeRecuperacion.value = mensaje
+  }
+}
 
 export const validarDatosAutoservice = (datos) => {
   return datosTienenIntegridad(datos)
@@ -80,7 +125,7 @@ const eliminarSnapshot = async (id) => {
 
 export const seleccionarSnapshotsAntiguos = (snapshots, maximo = MAX_SNAPSHOTS) =>
   [...snapshots]
-    .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+    .sort(compararSnapshots)
     .slice(maximo)
 
 const limitarSnapshots = async () => {
@@ -90,7 +135,7 @@ const limitarSnapshots = async () => {
   await Promise.all(antiguos.map((snapshot) => eliminarSnapshot(snapshot.id)))
 }
 
-export const crearSnapshotRecuperacion = async (datos, origen = 'automatico') => {
+const guardarSnapshotRecuperacion = async (datos, origen, revision) => {
   if (!validarDatosAutoservice(datos)) {
     throw new Error('Los datos no tienen un formato válido para crear la copia local')
   }
@@ -99,6 +144,7 @@ export const crearSnapshotRecuperacion = async (datos, origen = 'automatico') =>
   const snapshot = {
     version: '1.0',
     fecha,
+    revision,
     origen,
     datos: clonarDatos(datos)
   }
@@ -109,8 +155,7 @@ export const crearSnapshotRecuperacion = async (datos, origen = 'automatico') =>
     const ultimoSnapshot = seleccionarUltimoSnapshotValido(snapshotsExistentes)
     if (ultimoSnapshot && JSON.stringify(ultimoSnapshot.datos) === JSON.stringify(datos)) {
       ultimoSnapshotLocal.value = ultimoSnapshot.fecha
-      estadoRecuperacion.value = 'protegido'
-      mensajeRecuperacion.value = 'Los datos no cambiaron desde la última copia local.'
+      informarSnapshotDisponible(ultimoSnapshot.revision || revision, 'Los datos no cambiaron desde la última copia local.', datos)
       return ultimoSnapshot
     }
 
@@ -125,8 +170,7 @@ export const crearSnapshotRecuperacion = async (datos, origen = 'automatico') =>
     ultimoSnapshotLocal.value = fecha
     try {
       localStorage.setItem(LAST_SNAPSHOT_KEY, fecha)
-      estadoRecuperacion.value = 'protegido'
-      mensajeRecuperacion.value = 'Los datos tienen una copia local de recuperación.'
+      informarSnapshotDisponible(revision, 'Los datos tienen una copia local de recuperación.', datos)
     } catch {
       estadoRecuperacion.value = 'advertencia'
       mensajeRecuperacion.value = 'La copia de recuperación está disponible, pero localStorage no admite escrituras.'
@@ -139,22 +183,30 @@ export const crearSnapshotRecuperacion = async (datos, origen = 'automatico') =>
   }
 }
 
-export const programarSnapshotRecuperacion = (datos, demora = 700) => {
-  snapshotPendiente = clonarDatos(datos)
+export const crearSnapshotRecuperacion = (datos, origen = 'automatico', revision = crearRevisionDatos()) => {
+  const copia = clonarDatos(datos)
+  registrarRevisionDatos(revision)
+  const guardado = colaSnapshots.then(() => guardarSnapshotRecuperacion(copia, origen, revision))
+  colaSnapshots = guardado.catch(() => {})
+  return guardado
+}
+
+export const programarSnapshotRecuperacion = (datos, demora = 700, revision = crearRevisionDatos()) => {
+  snapshotPendiente = { datos: clonarDatos(datos), revision }
   if (snapshotTimer) clearTimeout(snapshotTimer)
 
   snapshotTimer = setTimeout(() => {
-    const datosAGuardar = snapshotPendiente
+    const pendiente = snapshotPendiente
     snapshotTimer = null
     snapshotPendiente = null
-    void crearSnapshotRecuperacion(datosAGuardar).catch(() => {})
+    void crearSnapshotRecuperacion(pendiente.datos, 'automatico', pendiente.revision).catch(() => {})
   }, demora)
 }
 
 export const seleccionarUltimoSnapshotValido = (snapshots) =>
   [...snapshots]
     .filter((snapshot) => snapshot?.fecha && validarDatosAutoservice(snapshot.datos))
-    .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0] || null
+    .sort(compararSnapshots)[0] || null
 
 export const obtenerUltimoSnapshotValido = async () => {
   try {

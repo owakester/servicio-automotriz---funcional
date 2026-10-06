@@ -1,6 +1,7 @@
 import { useAutoService } from './useAutoService'
 import { useGoogleDrive } from './useGoogleDrive'
 import { useNotifications } from './useNotifications'
+import { diasHastaFecha, fechaParaInput, formatearFecha, parsearFechaLocal } from '../utils/dates'
 
 export const useProximosServicios = () => {
   const { vehiculos, servicios, obtenerClientePorId, obtenerServiciosPorVehiculo } = useAutoService()
@@ -18,11 +19,11 @@ export const useProximosServicios = () => {
       
       const ultimoServicio = serviciosVehiculo
         .filter(s => s.proximoServicio)
-        .sort((a, b) => new Date(b.fechaServicio) - new Date(a.fechaServicio))[0]
+        .sort((a, b) => parsearFechaLocal(b.fechaServicio) - parsearFechaLocal(a.fechaServicio))[0]
 
       if (ultimoServicio && ultimoServicio.proximoServicio) {
-        const fechaProximoServicio = new Date(ultimoServicio.proximoServicio + 'T00:00:00')
-        const diasRestantes = Math.ceil((fechaProximoServicio - hoy) / (1000 * 60 * 60 * 24))
+        const diasRestantes = diasHastaFecha(ultimoServicio.proximoServicio, hoy)
+        if (diasRestantes === null) return
         
         let estado = 'Normal'; let prioridad = 'Baja'
         
@@ -62,10 +63,10 @@ export const useProximosServicios = () => {
       'Último Servicio (Tipo)', 'Último Servicio (KM)', 'Último Servicio (Costo)', 'Observaciones'
     ]
     const filas = datos.map(s => [
-      new Date(s.fecha_proximo_servicio + 'T00:00:00').toLocaleDateString('es-ES'),
+      formatearFecha(s.fecha_proximo_servicio),
       s.dias_restantes, s.estado, s.prioridad, `"${s.cliente_nombre}"`, s.cliente_telefono,
       s.cliente_email, s.vehiculo_marca, s.vehiculo_modelo, s.vehiculo_patente, s.vehiculo_año,
-      s.vehiculo_color, new Date(s.ultimo_servicio_fecha + 'T00:00:00').toLocaleDateString('es-ES'),
+      s.vehiculo_color, formatearFecha(s.ultimo_servicio_fecha),
       `"${s.ultimo_servicio_tipo}"`, s.ultimo_servicio_km, s.ultimo_servicio_costo, `"${s.observaciones}"`
     ])
     return [headers, ...filas].map(fila => fila.join(',')).join('\n')
@@ -81,7 +82,7 @@ export const useProximosServicios = () => {
       if (!csvContent) return;
 
       const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
-      const fechaHoy = new Date().toISOString().split('T')[0]
+      const fechaHoy = fechaParaInput()
       const nombreArchivo = `proximos_servicios_${fechaHoy}.csv`
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob); link.download = nombreArchivo;

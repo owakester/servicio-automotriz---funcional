@@ -1,33 +1,35 @@
-import { computed } from 'vue'
 import { useAutoService } from './useAutoService'
+import { formatearFecha, inicioDelDia, parsearFechaLocal } from '../utils/dates'
 
 export const useReports = () => {
   const { clientes, vehiculos, servicios, obtenerClientePorId, obtenerVehiculoPorId } = useAutoService()
 
   // Reporte de servicios por periodo
   const getServiciosPorPeriodo = (fechaInicio, fechaFin) => {
-    const inicio = new Date(fechaInicio)
-    const fin = new Date(fechaFin)
+    const inicio = inicioDelDia(fechaInicio)
+    const fin = inicioDelDia(fechaFin)
+    fin.setDate(fin.getDate() + 1)
     
     return servicios.value
       .filter(servicio => {
-        const fechaServicio = new Date(servicio.fechaServicio)
-        return fechaServicio >= inicio && fechaServicio <= fin
+        const fechaServicio = parsearFechaLocal(servicio.fechaServicio)
+        return fechaServicio >= inicio && fechaServicio < fin
       })
       .map(servicio => ({
         ...servicio,
         cliente: obtenerClientePorId(servicio.clienteId),
         vehiculo: obtenerVehiculoPorId(servicio.vehiculoId)
       }))
-      .sort((a, b) => new Date(b.fechaServicio) - new Date(a.fechaServicio))
+      .sort((a, b) => parsearFechaLocal(b.fechaServicio) - parsearFechaLocal(a.fechaServicio))
   }
 
   // Reporte de ingresos por periodo
   const getIngresosPorPeriodo = (fechaInicio, fechaFin) => {
     const serviciosPeriodo = getServiciosPorPeriodo(fechaInicio, fechaFin)
+      .filter(servicio => servicio.estado === 'completado')
     
     const totalIngresos = serviciosPeriodo.reduce((total, servicio) => 
-      total + (servicio.costo || 0), 0
+      total + (Number(servicio.costo) || 0), 0
     )
 
     const ingresosPorTipo = serviciosPeriodo.reduce((acc, servicio) => {
@@ -36,7 +38,7 @@ export const useReports = () => {
         acc[tipo] = { cantidad: 0, total: 0 }
       }
       acc[tipo].cantidad++
-      acc[tipo].total += servicio.costo || 0
+      acc[tipo].total += Number(servicio.costo) || 0
       return acc
     }, {})
 
@@ -51,9 +53,9 @@ export const useReports = () => {
   // Reporte de clientes más frecuentes
   const getClientesFrecuentes = (limite = 10) => {
     const clientesConServicios = clientes.value.map(cliente => {
-      const serviciosCliente = servicios.value.filter(s => s.clienteId === cliente.id)
+      const serviciosCliente = servicios.value.filter(s => String(s.clienteId) === String(cliente.id) && s.estado === 'completado')
       const totalGastado = serviciosCliente.reduce((total, servicio) => 
-        total + (servicio.costo || 0), 0
+        total + (Number(servicio.costo) || 0), 0
       )
       
       return {
@@ -61,7 +63,7 @@ export const useReports = () => {
         cantidadServicios: serviciosCliente.length,
         totalGastado,
         ultimoServicio: serviciosCliente
-          .sort((a, b) => new Date(b.fechaServicio) - new Date(a.fechaServicio))[0]
+          .sort((a, b) => parsearFechaLocal(b.fechaServicio) - parsearFechaLocal(a.fechaServicio))[0]
       }
     })
     .filter(cliente => cliente.cantidadServicios > 0)
@@ -101,15 +103,15 @@ export const useReports = () => {
 
     const estadisticasPorMes = meses.map((mes, index) => {
       const inicioMes = new Date(anio, index, 1)
-      const finMes = new Date(anio, index + 1, 0)
+      const finMes = new Date(anio, index + 1, 1)
       
       const serviciosMes = servicios.value.filter(servicio => {
-        const fechaServicio = new Date(servicio.fechaServicio)
-        return fechaServicio >= inicioMes && fechaServicio <= finMes
+        const fechaServicio = parsearFechaLocal(servicio.fechaServicio)
+        return fechaServicio >= inicioMes && fechaServicio < finMes
       })
 
-      const ingresosMes = serviciosMes.reduce((total, servicio) => 
-        total + (servicio.costo || 0), 0
+      const ingresosMes = serviciosMes.filter(servicio => servicio.estado === 'completado').reduce((total, servicio) =>
+        total + (Number(servicio.costo) || 0), 0
       )
 
       return {
@@ -156,7 +158,7 @@ export const useReports = () => {
     const servicios = getServiciosPorPeriodo(fechaInicio, fechaFin)
     
     const columnas = {
-      'Fecha': (s) => new Date(s.fechaServicio).toLocaleDateString('es-ES'),
+      'Fecha': (s) => formatearFecha(s.fechaServicio),
       'Cliente': (s) => s.cliente?.nombre || '',
       'Vehículo': (s) => `${s.vehiculo?.marca || ''} ${s.vehiculo?.modelo || ''}`,
       'Patente': (s) => s.vehiculo?.patente || '',
@@ -180,9 +182,9 @@ export const useReports = () => {
       'Teléfono': (c) => c.telefono,
       'Dirección': (c) => c.direccion || '',
       'Cantidad de Servicios': (c) => c.cantidadServicios,
-      'Total Gastado': (c) => c.totalGastado,
-      'Último Servicio': (c) => c.ultimoServicio ? new Date(c.ultimoServicio.fechaServicio).toLocaleDateString('es-ES') : '',
-      'Fecha de Registro': (c) => new Date(c.fechaCreacion).toLocaleDateString('es-ES')
+      'Total de trabajos realizados': (c) => c.totalGastado,
+      'Último Servicio': (c) => c.ultimoServicio ? formatearFecha(c.ultimoServicio.fechaServicio) : '',
+      'Fecha de Registro': (c) => formatearFecha(c.fechaCreacion)
     }
 
     exportarCSV(clientesConDatos, 'clientes', columnas)
