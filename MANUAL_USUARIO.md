@@ -77,6 +77,8 @@ Para tener una copia externa:
 2. Conectá Google Drive o presioná **Guardar copia** para descargar un archivo.
 3. Comprobá una vez por semana que la copia externa sea reciente.
 
+En Configuración se muestra la **Cuenta del taller** prevista para Drive. Presioná **Conectar**, iniciá sesión con ese correo y autorizá el acceso. Luego comprobá que **Cuenta conectada** muestre el mismo correo. Si elegís otra cuenta, el programa rechaza la conexión; las copias locales siguen disponibles. Cambiar la cuenta no mueve los archivos que ya estaban en otro Drive.
+
 Para cambiar de computadora, descargá primero un backup. En la nueva computadora entrá en Configuración y elegí **Importar backup desde archivo**.
 
 ## Rutina recomendada

@@ -90,6 +90,16 @@ npm run build
 npm run preview
 ```
 
+## Cuenta de Google Drive del taller
+
+Copiar `.env.example` a `.env.local` y completar `VITE_GOOGLE_CLIENT_ID` con el cliente OAuth web y `VITE_GOOGLE_DRIVE_EMAIL` con el correo del taller. Reiniciar `npm run dev` después de modificar estas variables; volver a compilar si se usa una versión de producción. `.env.local` no se publica en GitHub. El correo estará visible en la aplicación compilada: no es una contraseña ni un secreto.
+
+Desde **Configuración → Conectar**, iniciar sesión y autorizar esa cuenta. El programa la sugiere mediante `login_hint` y verifica el correo real con `Drive about.get` antes de habilitar backups, documentos o fotos. Una cuenta distinta o una verificación fallida no habilitan operaciones en Drive. Se mantiene el permiso limitado `drive.file`; no hace falta una contraseña ni Client Secret en el código.
+
+Si Google muestra «acceso bloqueado» y el cliente OAuth está en modo de prueba, el administrador del proyecto debe agregar la cuenta del taller como usuario de prueba en Google Cloud. Cambiar el correo no traslada archivos de una cuenta anterior ni cambia los datos locales.
+
+Referencias: [OAuth y login_hint](https://developers.google.com/identity/oauth2/web/reference/js-reference), [consulta de cuenta de Drive con drive.file](https://developers.google.com/workspace/drive/api/reference/rest/v3/about/get).
+
 ## 📁 Estructura del Proyecto
 
 ```

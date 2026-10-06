@@ -22,6 +22,12 @@
                 <p class="text-xs text-blue-700">
                   {{ estaAutenticado() ? 'Tus backups pueden guardarse automáticamente en la nube' : 'Conecta para habilitar backup automático en la nube' }}
                 </p>
+                <p v-if="correoGoogleDriveConfigurado" class="text-xs text-blue-900 mt-1">
+                  Cuenta del taller: {{ correoGoogleDriveConfigurado }}
+                </p>
+                <p v-if="estaAutenticado()" class="text-xs text-blue-900 mt-1">
+                  Cuenta conectada: {{ cuentaGoogleDrive }}
+                </p>
                 <p v-if="copiaNubePendiente" class="text-xs font-medium text-amber-700 mt-1">
                   Hay una copia pendiente de subir. Se reintentará cuando vuelvas a conectar Drive.
                 </p>
@@ -30,10 +36,11 @@
             <button
               v-if="!estaAutenticado()"
               @click="conectarGoogleDrive"
+              :disabled="conectandoGD"
               class="btn-primary text-sm"
             >
               <Cloud class="h-4 w-4 mr-1" />
-              Conectar
+              {{ conectandoGD ? 'Conectando…' : 'Conectar' }}
             </button>
           </div>
         </div>
@@ -441,7 +448,7 @@ const {
 } = useBackupSystem()
 
 // 🆕 GOOGLE DRIVE
-const { estaAutenticado, initializeGoogleDrive, authenticateUser } = useGoogleDrive()
+const { estaAutenticado, initializeGoogleDrive, authenticateUser, cuentaGoogleDrive, correoGoogleDriveConfigurado } = useGoogleDrive()
 
 // 🆕 NUEVOS ESTADOS LOCALES
 const mostrarBackupsGoogleDrive = ref(false)

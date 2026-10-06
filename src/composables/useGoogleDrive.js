@@ -5,6 +5,7 @@ import { useNotifications } from './useNotifications'
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
 const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'
 const SCOPES = 'https://www.googleapis.com/auth/drive.file'
+const CORREO_DRIVE = (import.meta.env?.VITE_GOOGLE_DRIVE_EMAIL || '').trim().toLowerCase()
 
 const leerLocalSeguro = (clave) => {
   try { return localStorage.getItem(clave) }
@@ -27,51 +28,112 @@ const refreshToken = ref(leerLocalSeguro('google_refresh_token'))
 const tokenExpiry = ref(leerLocalSeguro('google_token_expiry'))
 const tokenClient = ref(null)
 const initializationError = ref(null)
+const cuentaGoogleDrive = ref('')
+let tokenVerificado = null
+let revisionSesion = 0
+let solicitudTokenEnCurso = null
 
 export const useGoogleDrive = () => {
   const { success, error } = useNotifications()
 
-  const aplicarRespuestaToken = (tokenResponse, notificar = false) => {
+  const limpiarSesion = () => {
+    revisionSesion++
+    tokenVerificado = null
+    accessToken.value = null
+    cuentaGoogleDrive.value = ''
+    tokenExpiry.value = null
+    isAuthenticated.value = false
+    eliminarLocalSeguro('google_token_expiry')
+    try { window.gapi?.client?.setToken?.(null) } catch {}
+  }
+
+  const aplicarRespuestaToken = async (tokenResponse, notificar = false) => {
+    limpiarSesion()
+    const revision = revisionSesion
     if (tokenResponse?.error || !tokenResponse?.access_token) {
       if (notificar) error(`Error token: ${tokenResponse?.error || 'sin access_token'}`)
       return false
     }
 
-    accessToken.value = tokenResponse.access_token
-    const expiresIn = tokenResponse.expires_in || 3600
-    tokenExpiry.value = String(Date.now() + expiresIn * 1000)
-    guardarLocalSeguro('google_token_expiry', tokenExpiry.value)
-    isAuthenticated.value = true
-    window.gapi.client.setToken({ access_token: tokenResponse.access_token })
-    if (notificar) success('Google Drive conectado correctamente')
-    return true
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 10000)
+    try {
+      // El hint de OAuth no impide elegir otra cuenta. Comprobar al propietario
+      // con el mismo permiso drive.file, antes de habilitar backups o imágenes.
+      const respuesta = await fetch('https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)', {
+        headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+        signal: controller.signal
+      })
+      if (!respuesta.ok) throw new Error('No se pudo verificar la cuenta de Google Drive. Volvé a conectar.')
+      const perfil = await respuesta.json()
+      const correo = (perfil.user?.emailAddress || '').trim().toLowerCase()
+      if (!correo) throw new Error('Google no informó la cuenta conectada. Volvé a conectar.')
+      if (CORREO_DRIVE && correo !== CORREO_DRIVE) {
+        throw new Error(`Para guardar los datos del taller, conectá ${CORREO_DRIVE}. La cuenta elegida no es la configurada.`)
+      }
+      if (revision !== revisionSesion) return false
+
+      accessToken.value = tokenResponse.access_token
+      tokenVerificado = tokenResponse.access_token
+      cuentaGoogleDrive.value = correo
+      const expiresIn = Number(tokenResponse.expires_in) || 3600
+      tokenExpiry.value = String(Date.now() + expiresIn * 1000)
+      guardarLocalSeguro('google_token_expiry', tokenExpiry.value)
+      window.gapi.client.setToken({ access_token: tokenResponse.access_token })
+      isAuthenticated.value = true
+      if (notificar) success(`Google Drive conectado: ${correo}`)
+      return true
+    } catch (err) {
+      if (revision === revisionSesion) {
+        limpiarSesion()
+        error(err.name === 'AbortError' ? 'No se pudo verificar la cuenta a tiempo. Volvé a conectar Google Drive.' : err.message)
+      }
+      return false
+    } finally { clearTimeout(timeout) }
   }
 
-  const solicitarToken = (prompt = '', notificar = false) => new Promise((resolve) => {
-    if (!tokenClient.value) return resolve(false)
+  const solicitarToken = (prompt = '', notificar = false) => {
+    if (solicitudTokenEnCurso) return solicitudTokenEnCurso
+    limpiarSesion()
+    const revisionSolicitud = revisionSesion
+    solicitudTokenEnCurso = new Promise((resolve) => {
+      if (!tokenClient.value) return resolve(false)
 
-    let finalizado = false
-    const finalizar = (resultado) => {
-      if (finalizado) return
-      finalizado = true
-      resolve(resultado)
-    }
+      let finalizado = false
+      let timeout
+      const finalizar = (resultado) => {
+        if (finalizado) return
+        finalizado = true
+        clearTimeout(timeout)
+        resolve(resultado)
+      }
 
-    tokenClient.value.callback = (respuesta) => finalizar(aplicarRespuestaToken(respuesta, notificar))
-    tokenClient.value.error_callback = (respuesta) => {
-      if (notificar) error(`No se pudo conectar Google Drive: ${respuesta?.type || 'error desconocido'}`)
-      finalizar(false)
-    }
+      tokenClient.value.callback = async (respuesta) => {
+        if (finalizado) return
+        if (revisionSolicitud !== revisionSesion) return finalizar(false)
+        // La verificación tiene su propio límite y no debe finalizar antes que
+        // el resultado de la conexión ni habilitar respuestas OAuth tardías.
+        clearTimeout(timeout)
+        finalizar(await aplicarRespuestaToken(respuesta, notificar))
+      }
+      tokenClient.value.error_callback = (respuesta) => {
+        if (notificar) error(`No se pudo conectar Google Drive: ${respuesta?.type || 'error desconocido'}`)
+        finalizar(false)
+      }
 
-    try {
-      tokenClient.value.requestAccessToken({ prompt })
-    } catch (err) {
-      if (notificar) error(`No se pudo conectar Google Drive: ${err.message}`)
-      finalizar(false)
-    }
-
-    setTimeout(() => finalizar(false), 15000)
-  })
+      timeout = setTimeout(() => {
+        if (notificar) error('La conexión demoró demasiado. Intentá conectar Google Drive nuevamente.')
+        finalizar(false)
+      }, notificar ? 120000 : 15000)
+      try {
+        tokenClient.value.requestAccessToken({ prompt, ...(CORREO_DRIVE ? { login_hint: CORREO_DRIVE } : {}) })
+      } catch (err) {
+        if (notificar) error(`No se pudo conectar Google Drive: ${err.message}`)
+        finalizar(false)
+      }
+    }).finally(() => { solicitudTokenEnCurso = null })
+    return solicitudTokenEnCurso
+  }
 
   // ===== Helpers generales =====
   const diagnosticarProblemas = () => {
@@ -99,66 +161,31 @@ export const useGoogleDrive = () => {
       check()
     })
 
-  // Token siempre “fresco” desde gapi
+  // Nunca exponer un token cuya cuenta no se haya comprobado.
   const currentAccessToken = () => {
-    try {
-      const t = window?.gapi?.client?.getToken?.()
-      if (t && t.access_token) return t.access_token
-    } catch {}
-    return accessToken.value
+    return tokenVerificado === accessToken.value && cuentaGoogleDrive.value ? accessToken.value : null
   }
 
-  // ¿está por vencer? (margen 60s) — usa info de gapi si existe
+  // Usar la expiración absoluta de la respuesta OAuth verificada.
   const tokenProximoAExpirar = () => {
-    try {
-      const t = window?.gapi?.client?.getToken?.()
-      const nowMs = Date.now()
-      if (t && typeof t.expires_at === 'number') return (t.expires_at - nowMs) <= 60_000
-      if (t && typeof t.expires_in === 'number') return (t.expires_in * 1000) <= 60_000
-    } catch {}
     if (!tokenExpiry.value) return true
     const ahora = Date.now()
     const exp = parseInt(tokenExpiry.value)
-    // margen generoso del original: 5 min
+    // Renovar con un margen de cinco minutos.
     return (exp - ahora) <= 5 * 60 * 1000
   }
 
   const renovarTokenSiEsNecesario = async () => {
-    if (!tokenProximoAExpirar()) return true
+    if (estaAutenticado()) return true
     if (!tokenClient.value) return false
     return solicitarToken('', false)
   }
 
   const asegurarTokenValido = async () => {
-    // Si gapi ya tiene token, sincronizá estado local
-    if (!isAuthenticated.value) {
-      try {
-        const t = window?.gapi?.client?.getToken?.()
-        if (t?.access_token) {
-          accessToken.value = t.access_token
-          isAuthenticated.value = true
-        }
-      } catch {}
-    }
-
-    // Refresh proactivo si vence pronto
-    await renovarTokenSiEsNecesario()
-
-    // Asegurar que gapi tenga el token actual
-    try {
-      const t = window?.gapi?.client?.getToken?.()
-      const token = t?.access_token || accessToken.value
-      if (token) {
-        window.gapi.client.setToken({ access_token: token })
-        accessToken.value = token
-        isAuthenticated.value = true
-        return true
-      }
-    } catch {}
-
-    accessToken.value = null
-    isAuthenticated.value = false
-    return false
+    if (estaAutenticado()) return true
+    if (!tokenClient.value) return false
+    const renovado = await solicitarToken('', false)
+    return renovado && estaAutenticado()
   }
 
   // ===== Inicialización / Autenticación =====
@@ -186,7 +213,8 @@ export const useGoogleDrive = () => {
       tokenClient.value = window.google.accounts.oauth2.initTokenClient({
         client_id: CLIENT_ID,
         scope: SCOPES,
-        callback: (tokenResponse) => aplicarRespuestaToken(tokenResponse, true),
+        ...(CORREO_DRIVE ? { login_hint: CORREO_DRIVE } : {}),
+        callback: (tokenResponse) => { void aplicarRespuestaToken(tokenResponse, true) },
         error_callback: (e) => {
           error(`Error en autenticación: ${e?.type || 'desconocido'}`)
         }
@@ -219,40 +247,25 @@ export const useGoogleDrive = () => {
 
   // Verificación de autenticación (optimizada)
   const estaAutenticado = () => {
-    const hasGapi = !!(window.gapi && window.gapi.client)
-    const hasLocal = !!accessToken.value
-    const tokenValido = !tokenProximoAExpirar()
-    let gapiTokenSet = false
-    let gapiToken = null
-
-    if (hasGapi) {
-      try {
-        const t = window.gapi.client.getToken()
-        gapiTokenSet = !!(t && t.access_token)
-        gapiToken = t?.access_token || null
-      } catch {}
-    }
-
-    // Sincronizaciones suaves
-    if (!hasLocal && gapiToken && hasGapi && tokenValido) {
-      accessToken.value = gapiToken
-      isAuthenticated.value = true
-    }
-    if (hasLocal && !gapiTokenSet && hasGapi && tokenValido) {
-      try { window.gapi.client.setToken({ access_token: accessToken.value }); gapiTokenSet = true } catch {}
-    }
-
-    return hasGapi && (hasLocal || gapiTokenSet) && tokenValido
+    try {
+      return Boolean(isAuthenticated.value && cuentaGoogleDrive.value &&
+        (!CORREO_DRIVE || cuentaGoogleDrive.value === CORREO_DRIVE) &&
+        accessToken.value && tokenVerificado === accessToken.value &&
+        window.gapi?.client?.getToken?.()?.access_token === tokenVerificado &&
+        !tokenProximoAExpirar())
+    } catch { return false }
   }
 
   // ===== Carpetas =====
   const crearCarpeta = async (name, parentId = null) => {
+    if (!await asegurarTokenValido()) throw new Error('Conectá la cuenta de Google Drive del taller primero')
     const metadata = { name, mimeType: 'application/vnd.google-apps.folder', parents: parentId ? [parentId] : undefined }
     const res = await window.gapi.client.drive.files.create({ resource: metadata })
     return res.result.id
   }
 
   const buscarCarpeta = async (name) => {
+    if (!await asegurarTokenValido()) throw new Error('Conectá la cuenta de Google Drive del taller primero')
     const res = await window.gapi.client.drive.files.list({
       q: `name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
       spaces: 'drive'
@@ -507,13 +520,9 @@ export const useGoogleDrive = () => {
       if (accessToken.value) {
         window.google?.accounts?.oauth2?.revoke?.(accessToken.value, () => {})
       }
-      accessToken.value = null
+      limpiarSesion()
       refreshToken.value = null
-      tokenExpiry.value = null
-      isAuthenticated.value = false
       eliminarLocalSeguro('google_refresh_token')
-      eliminarLocalSeguro('google_token_expiry')
-      try { window.gapi?.client?.setToken?.(null) } catch {}
       success('Sesión cerrada correctamente')
     } catch (err) {
       error('Error al cerrar sesión')
@@ -537,6 +546,8 @@ export const useGoogleDrive = () => {
     isAuthenticated,
     initializationError,
     accessToken,
+    cuentaGoogleDrive,
+    correoGoogleDriveConfigurado: CORREO_DRIVE,
 
     // Inicialización / Auth
     initializeGoogleDrive,

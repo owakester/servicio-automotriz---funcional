@@ -12,6 +12,12 @@
 
 ## Pendiente de prueba manual
 
+### Validación de la cuenta del taller
+
+Se agregó `npm run test:drive-account`: 10/10 casos con OAuth y Drive simulados. Comprueba sugerencia de cuenta, rechazo de otro correo, bloqueo de carpetas/subidas, identidad ausente, fallos de red, renovación, tokens no verificados, solicitudes simultáneas y respuestas tardías después de cerrar sesión. `npm test` y `npm run build` pasaron con este cambio. En la pantalla de Configuración se verificó que aparece la cuenta definida en `.env.local`, sin errores de ejecución.
+
+La cuenta prevista todavía debe iniciar sesión y autorizar el acceso real. Estas pruebas no demuestran una subida ni una restauración real de Drive, y cambiar el correo no traslada los backups anteriores.
+
 - Subida real de fotos a Google Drive y su conservación después de editar: los adjuntos están cubiertos por regresiones, pero la subida remota requiere conexión con la cuenta del taller.
 - Descargar y restaurar una copia real de Google Drive. La búsqueda «backup-autoservice» no encontró archivos en la cuenta abierta; falta identificar la cuenta correcta o disponer del JSON descargado.
 - Descarga e importación de JSON de extremo a extremo en el navegador: se pulsó «Guardar copia», pero no se pudo confirmar el archivo descargado. La herramienta de navegador rechazó cargar el archivo de prueba. Esto no demuestra un fallo del programa; requiere comprobar ambos pasos manualmente.
