@@ -1,17 +1,18 @@
 <template>
-  <div class="fixed top-4 right-4 z-50 space-y-2">
-    <TransitionGroup name="notification" tag="div">
+  <Teleport to="body">
+  <div class="notification-region">
+    <TransitionGroup name="notification" tag="div" class="notification-list">
       <div
         v-for="notification in notifications"
         :key="notification.id"
         :role="notification.type === 'error' ? 'alert' : 'status'"
         :aria-live="notification.type === 'error' ? 'assertive' : 'polite'"
         :class="[
-          'max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5',
+          'w-full min-w-0 bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5',
           getNotificationClasses(notification.type)
         ]"
       >
-        <div class="flex-1 w-0 p-4">
+        <div class="flex-1 min-w-0 p-4">
           <div class="flex items-start">
             <div class="flex-shrink-0">
               <component 
@@ -20,8 +21,8 @@
                 aria-hidden="true"
               />
             </div>
-            <div class="ml-3 flex-1">
-              <p class="text-sm font-medium text-gray-900">
+            <div class="ml-3 min-w-0 flex-1">
+              <p class="notification-message text-sm font-medium text-gray-900">
                 {{ notification.message }}
               </p>
             </div>
@@ -29,7 +30,7 @@
               <button
                 type="button"
                 @click="removeNotification(notification.id)"
-                class="bg-white rounded-md inline-flex text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                class="bg-white rounded-md inline-flex p-1 text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 aria-label="Cerrar notificación"
               >
                 <X class="h-5 w-5" aria-hidden="true" />
@@ -40,6 +41,7 @@
       </div>
     </TransitionGroup>
   </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -80,22 +82,55 @@ const getNotificationClasses = (type) => {
 </script>
 
 <style scoped>
+.notification-region {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 2rem);
+  max-width: 32rem;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.notification-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  padding: 0.25rem;
+}
+
+.notification-list > div {
+  flex-shrink: 0;
+}
+
+.notification-message {
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
 .notification-enter-active,
 .notification-leave-active {
-  transition: all 0.3s ease;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
-.notification-enter-from {
-  opacity: 0;
-  transform: translateX(100%);
-}
-
+.notification-enter-from,
 .notification-leave-to {
   opacity: 0;
-  transform: translateX(100%);
+  transform: translateY(-0.5rem);
 }
 
 .notification-move {
   transition: transform 0.3s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notification-enter-active,
+  .notification-leave-active,
+  .notification-move {
+    transition: none;
+  }
 }
 </style>
