@@ -2,23 +2,76 @@
 import { ref } from 'vue'
 import { useNotifications } from './useNotifications'
 
+const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
+const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'
+const SCOPES = 'https://www.googleapis.com/auth/drive.file'
+
+const leerLocalSeguro = (clave) => {
+  try { return localStorage.getItem(clave) }
+  catch { return null }
+}
+const guardarLocalSeguro = (clave, valor) => {
+  try { localStorage.setItem(clave, valor) }
+  catch { /* La sesión actual sigue funcionando en memoria. */ }
+}
+const eliminarLocalSeguro = (clave) => {
+  try { localStorage.removeItem(clave) }
+  catch { /* Sin almacenamiento persistente no hay nada que limpiar. */ }
+}
+
+// Una sola sesión de Google Drive para Configuración, Backups e Imágenes.
+const isInitialized = ref(false)
+const isAuthenticated = ref(false)
+const accessToken = ref(null)
+const refreshToken = ref(leerLocalSeguro('google_refresh_token'))
+const tokenExpiry = ref(leerLocalSeguro('google_token_expiry'))
+const tokenClient = ref(null)
+const initializationError = ref(null)
+
 export const useGoogleDrive = () => {
   const { success, error } = useNotifications()
 
-  // Configuración
-  const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
-  const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'
-  const SCOPES = 'https://www.googleapis.com/auth/drive.file'
+  const aplicarRespuestaToken = (tokenResponse, notificar = false) => {
+    if (tokenResponse?.error || !tokenResponse?.access_token) {
+      if (notificar) error(`Error token: ${tokenResponse?.error || 'sin access_token'}`)
+      return false
+    }
 
-  // Estado
-  const isInitialized = ref(false)
-  const isAuthenticated = ref(false)
-  const accessToken = ref(null)
-  // Mantengo estos dos por compatibilidad (pero no los necesito para funcionar)
-  const refreshToken = ref(localStorage.getItem('google_refresh_token') || null)
-  const tokenExpiry = ref(localStorage.getItem('google_token_expiry') || null)
-  const tokenClient = ref(null)
-  const initializationError = ref(null)
+    accessToken.value = tokenResponse.access_token
+    const expiresIn = tokenResponse.expires_in || 3600
+    tokenExpiry.value = String(Date.now() + expiresIn * 1000)
+    guardarLocalSeguro('google_token_expiry', tokenExpiry.value)
+    isAuthenticated.value = true
+    window.gapi.client.setToken({ access_token: tokenResponse.access_token })
+    if (notificar) success('Google Drive conectado correctamente')
+    return true
+  }
+
+  const solicitarToken = (prompt = '', notificar = false) => new Promise((resolve) => {
+    if (!tokenClient.value) return resolve(false)
+
+    let finalizado = false
+    const finalizar = (resultado) => {
+      if (finalizado) return
+      finalizado = true
+      resolve(resultado)
+    }
+
+    tokenClient.value.callback = (respuesta) => finalizar(aplicarRespuestaToken(respuesta, notificar))
+    tokenClient.value.error_callback = (respuesta) => {
+      if (notificar) error(`No se pudo conectar Google Drive: ${respuesta?.type || 'error desconocido'}`)
+      finalizar(false)
+    }
+
+    try {
+      tokenClient.value.requestAccessToken({ prompt })
+    } catch (err) {
+      if (notificar) error(`No se pudo conectar Google Drive: ${err.message}`)
+      finalizar(false)
+    }
+
+    setTimeout(() => finalizar(false), 15000)
+  })
 
   // ===== Helpers generales =====
   const diagnosticarProblemas = () => {
@@ -73,28 +126,7 @@ export const useGoogleDrive = () => {
   const renovarTokenSiEsNecesario = async () => {
     if (!tokenProximoAExpirar()) return true
     if (!tokenClient.value) return false
-    return new Promise((resolve) => {
-      let done = false
-      tokenClient.value.requestAccessToken({
-        prompt: '',
-        callback: (resp) => {
-          if (resp?.access_token && !resp?.error) {
-            // refresco ok
-            const expiresIn = resp.expires_in || 3600
-            accessToken.value = resp.access_token
-            tokenExpiry.value = String(Date.now() + expiresIn * 1000)
-            localStorage.setItem('google_token_expiry', tokenExpiry.value)
-            isAuthenticated.value = true
-            window.gapi.client.setToken({ access_token: resp.access_token })
-            done = true
-            resolve(true)
-          } else {
-            resolve(false)
-          }
-        }
-      })
-      setTimeout(() => { if (!done) resolve(false) }, 10000)
-    })
+    return solicitarToken('', false)
   }
 
   const asegurarTokenValido = async () => {
@@ -132,6 +164,7 @@ export const useGoogleDrive = () => {
   // ===== Inicialización / Autenticación =====
   const initializeGoogleDrive = async () => {
     try {
+      if (isInitialized.value && tokenClient.value) return true
       if (!CLIENT_ID) throw new Error('CLIENT_ID no definido en .env')
       if (!diagnosticarProblemas()) throw new Error('Diagnóstico inicial falló')
 
@@ -153,23 +186,7 @@ export const useGoogleDrive = () => {
       tokenClient.value = window.google.accounts.oauth2.initTokenClient({
         client_id: CLIENT_ID,
         scope: SCOPES,
-        callback: (tokenResponse) => {
-          if (tokenResponse?.error || !tokenResponse?.access_token) {
-            error(`Error token: ${tokenResponse?.error || 'sin access_token'}`)
-            return
-          }
-          accessToken.value = tokenResponse.access_token
-          const expiresIn = tokenResponse.expires_in || 3600
-          tokenExpiry.value = String(Date.now() + expiresIn * 1000)
-          localStorage.setItem('google_token_expiry', tokenExpiry.value)
-          if (tokenResponse.refresh_token) {
-            refreshToken.value = tokenResponse.refresh_token
-            localStorage.setItem('google_refresh_token', refreshToken.value)
-          }
-          isAuthenticated.value = true
-          window.gapi.client.setToken({ access_token: tokenResponse.access_token })
-          success('Autenticación exitosa con Google Drive')
-        },
+        callback: (tokenResponse) => aplicarRespuestaToken(tokenResponse, true),
         error_callback: (e) => {
           error(`Error en autenticación: ${e?.type || 'desconocido'}`)
         }
@@ -177,7 +194,6 @@ export const useGoogleDrive = () => {
 
       isInitialized.value = true
       initializationError.value = null
-      success('Google Drive API inicializada correctamente')
       return true
     } catch (err) {
       initializationError.value = err.message
@@ -194,8 +210,7 @@ export const useGoogleDrive = () => {
       }
       if (!tokenClient.value) throw new Error('TokenClient no disponible')
 
-      tokenClient.value.requestAccessToken({ prompt: 'consent' })
-      return true
+      return await solicitarToken('consent', true)
     } catch (err) {
       error(`Error al autenticar: ${err.message}`)
       return false
@@ -269,11 +284,8 @@ export const useGoogleDrive = () => {
 
       // retry 401 silencioso
       if (response.status === 401 && tokenClient?.value) {
-        await new Promise((resolve) => {
-          let done = false
-          tokenClient.value.requestAccessToken({ prompt: '', callback: () => { done = true; resolve() } })
-          setTimeout(() => { if (!done) resolve() }, 2500)
-        })
+        const renovado = await solicitarToken('', false)
+        if (!renovado) throw new Error('La sesión de Google Drive venció. Vuelve a conectarla.')
         response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${currentAccessToken()}` },
@@ -299,7 +311,7 @@ export const useGoogleDrive = () => {
     }
   }
 
-  const descargarBackupDeGoogleDrive = async (fileId, nombreArchivo) => {
+  const descargarBackupDeGoogleDrive = async (fileId, nombreArchivo, descargarArchivo = true) => {
     try {
       const ok = await asegurarTokenValido()
       if (!ok) throw new Error('Token inválido o expirado')
@@ -310,14 +322,15 @@ export const useGoogleDrive = () => {
       if (!response.ok) throw new Error(`Error HTTP ${response.status}: ${response.statusText}`)
 
       const contenido = await response.text()
-      const blob = new Blob([contenido], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url; a.download = nombreArchivo
-      document.body.appendChild(a); a.click(); document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-
-      success(`Backup descargado: ${nombreArchivo}`)
+      if (descargarArchivo) {
+        const blob = new Blob([contenido], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url; a.download = nombreArchivo
+        document.body.appendChild(a); a.click(); document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+        success(`Backup descargado: ${nombreArchivo}`)
+      }
       return { success: true, contenido }
     } catch (err) {
       error(`Error al descargar backup: ${err.message}`); return { success: false, error: err.message }
@@ -440,6 +453,24 @@ export const useGoogleDrive = () => {
       }
       const contenidoJSON = JSON.stringify(backupCompleto, null, 2)
       const archivo = await subirArchivo(nombreArchivo, contenidoJSON, carpeta.id, 'application/json')
+
+      // Mantener una rotación simple: la copia actual y la inmediatamente anterior.
+      // Esto evita que el Drive del taller acumule cientos de archivos automáticos.
+      try {
+        const lista = await window.gapi.client.drive.files.list({
+          q: `'${carpeta.id}' in parents and trashed=false and name contains 'backup-autoservice'`,
+          orderBy: 'modifiedTime desc',
+          pageSize: 100,
+          fields: 'files(id, name, modifiedTime)'
+        })
+        const backupsAntiguos = (lista.result.files || []).slice(2)
+        await Promise.all(
+          backupsAntiguos.map((backup) => window.gapi.client.drive.files.delete({ fileId: backup.id }))
+        )
+      } catch (rotationError) {
+        console.warn('No se pudieron eliminar backups antiguos de Google Drive:', rotationError)
+      }
+
       success(`Backup guardado en Google Drive: ${nombreArchivo}`)
       return { success: true, fileId: archivo.id, fileName: archivo.name, webViewLink: archivo.webViewLink, uploadedAt: new Date().toISOString() }
     } catch (err) {
@@ -480,8 +511,8 @@ export const useGoogleDrive = () => {
       refreshToken.value = null
       tokenExpiry.value = null
       isAuthenticated.value = false
-      localStorage.removeItem('google_refresh_token')
-      localStorage.removeItem('google_token_expiry')
+      eliminarLocalSeguro('google_refresh_token')
+      eliminarLocalSeguro('google_token_expiry')
       try { window.gapi?.client?.setToken?.(null) } catch {}
       success('Sesión cerrada correctamente')
     } catch (err) {

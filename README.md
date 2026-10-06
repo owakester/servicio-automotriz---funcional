@@ -1,5 +1,7 @@
 # 🚗 AutoService Pro
 
+La guía para la persona que utiliza el sistema está disponible en [MANUAL_USUARIO.md](MANUAL_USUARIO.md) y dentro de la aplicación desde la opción **Ayuda**.
+
 Sistema de gestión integral para talleres automotrices desarrollado con Vue.js 3 y Tailwind CSS.
 
 ## ✨ Características
@@ -52,7 +54,7 @@ Sistema de gestión integral para talleres automotrices desarrollado con Vue.js 
 - **Estilos**: Tailwind CSS 3
 - **Iconos**: Lucide Vue Next
 - **Build Tool**: Vite
-- **Almacenamiento**: LocalStorage (persistencia del lado cliente)
+- **Almacenamiento**: LocalStorage con recuperación automática en IndexedDB
 
 ## 🚀 Instalación y Configuración
 
@@ -147,6 +149,8 @@ Accede a **Reportes** para:
 En **Configuración** puedes:
 - Exportar backup completo en formato JSON
 - Importar datos desde archivo de backup
+- Ver el estado de las copias locales automáticas (se conservan las últimas 3)
+- Mantener en Google Drive la copia más reciente y la anterior
 - Limpiar todos los datos
 - Ver estadísticas del sistema
 
@@ -204,10 +208,11 @@ En **Configuración** puedes:
 
 ## 📝 Notas Importantes
 
-- **Almacenamiento**: Los datos se guardan en LocalStorage del navegador
-- **Backup**: Se recomienda exportar backups periódicamente
+- **Almacenamiento**: Los datos se guardan en LocalStorage y se respaldan automáticamente en IndexedDB
+- **Recuperación**: Si LocalStorage falta o está corrupto, se restaura la última copia local válida
+- **Backup externo**: Google Drive conserva las dos copias más recientes cuando está conectado
 - **Navegadores**: Compatible con navegadores modernos (Chrome, Firefox, Safari, Edge)
-- **Datos**: No se envían datos a servidores externos
+- **Datos**: Solo se envían a Google Drive cuando el usuario conecta y habilita esa opción
 
 ## 🤝 Contribución
 

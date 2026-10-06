@@ -2,17 +2,25 @@
   <div class="fixed bottom-6 right-6 z-50">
     <!-- Botón principal -->
     <button
+      type="button"
       @click="toggleMenu"
       class="bg-green-500 hover:bg-green-600 text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110"
       :class="{ 'rotate-45': menuAbierto }"
+      :aria-label="menuAbierto ? 'Cerrar acciones de WhatsApp' : 'Abrir acciones de WhatsApp'"
+      :title="menuAbierto ? 'Cerrar acciones de WhatsApp' : 'Acciones de WhatsApp'"
+      :aria-expanded="menuAbierto"
+      aria-controls="whatsapp-actions-menu"
     >
-      <MessageCircle class="h-6 w-6" />
+      <MessageCircle class="h-6 w-6" aria-hidden="true" />
     </button>
 
     <!-- Menú desplegable -->
     <Transition name="fade-up">
       <div
         v-if="menuAbierto"
+        id="whatsapp-actions-menu"
+        role="menu"
+        aria-label="Acciones de WhatsApp"
         class="absolute bottom-16 right-0 bg-white rounded-lg shadow-xl border border-gray-200 py-2 min-w-[200px]"
       >
         <div class="px-4 py-2 border-b border-gray-100">
@@ -22,6 +30,8 @@
         <!-- Auto listo -->
         <button
           v-if="ordenesCompletadas.length > 0"
+          type="button"
+          role="menuitem"
           @click="mostrarOrdenesCompletadas"
           class="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center"
         >
@@ -35,6 +45,8 @@
         <!-- Recordatorios de servicio -->
         <button
           v-if="vehiculosConAlertas.length > 0"
+          type="button"
+          role="menuitem"
           @click="mostrarRecordatorios"
           class="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center"
         >
@@ -47,6 +59,8 @@
 
         <!-- Contacto directo -->
         <button
+          type="button"
+          role="menuitem"
           @click="mostrarContactoDirecto"
           class="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center"
         >
@@ -65,10 +79,11 @@
         v-if="mostrarModalOrdenes"
         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
         @click="cerrarModalOrdenes"
+        @keydown.esc="cerrarModalOrdenes"
       >
-        <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[70vh] overflow-y-auto" @click.stop>
-          <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
-            <CheckCircle class="h-5 w-5 mr-2 text-green-500" />
+        <div v-focus-trap class="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[70vh] overflow-y-auto" @click.stop role="dialog" aria-modal="true" aria-labelledby="whatsapp-ready-title" tabindex="-1">
+          <h3 id="whatsapp-ready-title" class="text-lg font-bold text-gray-900 mb-4 flex items-center">
+            <CheckCircle class="h-5 w-5 mr-2 text-green-500" aria-hidden="true" />
             Autos Listos
           </h3>
           
@@ -110,10 +125,11 @@
         v-if="mostrarModalRecordatorios"
         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
         @click="cerrarModalRecordatorios"
+        @keydown.esc="cerrarModalRecordatorios"
       >
-        <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[70vh] overflow-y-auto" @click.stop>
-          <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
-            <Clock class="h-5 w-5 mr-2 text-yellow-500" />
+        <div v-focus-trap class="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[70vh] overflow-y-auto" @click.stop role="dialog" aria-modal="true" aria-labelledby="whatsapp-reminders-title" tabindex="-1">
+          <h3 id="whatsapp-reminders-title" class="text-lg font-bold text-gray-900 mb-4 flex items-center">
+            <Clock class="h-5 w-5 mr-2 text-yellow-500" aria-hidden="true" />
             Recordatorios de Servicio
           </h3>
           
@@ -164,10 +180,11 @@
         v-if="mostrarModalContacto"
         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
         @click="cerrarModalContacto"
+        @keydown.esc="cerrarModalContacto"
       >
-        <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[70vh] overflow-y-auto" @click.stop>
-          <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
-            <Phone class="h-5 w-5 mr-2 text-blue-500" />
+        <div v-focus-trap class="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[70vh] overflow-y-auto" @click.stop role="dialog" aria-modal="true" aria-labelledby="whatsapp-contact-title" tabindex="-1">
+          <h3 id="whatsapp-contact-title" class="text-lg font-bold text-gray-900 mb-4 flex items-center">
+            <Phone class="h-5 w-5 mr-2 text-blue-500" aria-hidden="true" />
             Contacto Directo
           </h3>
           
@@ -176,6 +193,7 @@
               v-model="filtroContacto"
               type="text"
               placeholder="Buscar cliente..."
+              aria-label="Buscar cliente para contactar"
               class="input-field"
             />
           </div>

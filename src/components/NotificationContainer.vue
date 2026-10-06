@@ -4,6 +4,8 @@
       <div
         v-for="notification in notifications"
         :key="notification.id"
+        :role="notification.type === 'error' ? 'alert' : 'status'"
+        :aria-live="notification.type === 'error' ? 'assertive' : 'polite'"
         :class="[
           'max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5',
           getNotificationClasses(notification.type)
@@ -15,6 +17,7 @@
               <component 
                 :is="getIcon(notification.type)" 
                 :class="['h-5 w-5', getIconClasses(notification.type)]" 
+                aria-hidden="true"
               />
             </div>
             <div class="ml-3 flex-1">
@@ -24,10 +27,12 @@
             </div>
             <div class="ml-4 flex-shrink-0 flex">
               <button
+                type="button"
                 @click="removeNotification(notification.id)"
                 class="bg-white rounded-md inline-flex text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                aria-label="Cerrar notificación"
               >
-                <X class="h-5 w-5" />
+                <X class="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
           </div>

@@ -1,46 +1,26 @@
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div class="flex justify-between items-center">
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
       <h1 class="text-3xl font-bold text-gray-900">Órdenes de Mantenimiento</h1>
-      <div class="flex space-x-3">
+      <div>
         <button
-          @click="conectarGoogleDrive"
-          :disabled="!googleDriveEnabled || isConnecting"
-          :class="[
-            'flex items-center px-4 py-2 rounded-lg transition-colors',
-            !googleDriveEnabled || isConnecting ? 'bg-gray-400 text-gray-600 cursor-not-allowed' :
-            estaAutenticado() ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'
-          ]"
-        >
-          <Cloud class="h-4 w-4 mr-2" />
-          {{ 
-            isConnecting ? 'Conectando...' :
-            !googleDriveEnabled ? 'Google Drive Deshabilitado' :
-            estaAutenticado() ? 'Google Drive Conectado' : 'Conectar Google Drive'
-          }}
-        </button>
-        <button
-          v-if="estaAutenticado()"
-          @click="mostrarDebugInfo"
-          class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center"
-          title="Mostrar información de debug"
-        >
-          <AlertCircle class="h-4 w-4 mr-2" />
-          Debug
-        </button>
-        <button
+          v-if="vehiculos.length > 0"
           @click="mostrarFormulario = true"
           class="btn-primary flex items-center"
         >
-          <Plus class="h-4 w-4 mr-2" />
+          <Plus class="h-4 w-4 mr-2" aria-hidden="true" />
           Nueva Orden
         </button>
+        <router-link v-else to="/vehiculos" class="btn-primary inline-flex items-center">
+          <Car class="h-4 w-4 mr-2" aria-hidden="true" />
+          Agregar vehículo primero
+        </router-link>
       </div>
     </div>
 
     <!-- Estadísticas -->
-    <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-4">
+    <div v-if="ordenesCompletas.length > 0" class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-4">
       <div class="card text-center">
         <div class="text-2xl font-bold text-blue-600">{{ estadisticasOrdenes.total }}</div>
         <div class="text-sm text-gray-600">Total</div>
@@ -72,7 +52,7 @@
     </div>
 
     <!-- Filtros -->
-    <div class="card">
+    <div v-if="ordenesCompletas.length > 0" class="card">
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
           <input
@@ -183,39 +163,44 @@
                     v-if="orden.estado === 'completada'"
                     @click="notificarClienteWhatsApp(orden)"
                     class="p-2 text-green-600 hover:text-green-800 transition-colors"
-                    title="Notificar por WhatsApp que está listo"
+                  title="Notificar por WhatsApp que está listo"
+                  :aria-label="`Notificar por WhatsApp que la orden ${orden.numeroOrden} está lista`"
                   >
-                    <MessageCircle class="h-4 w-4" />
+                    <MessageCircle class="h-4 w-4" aria-hidden="true" />
                   </button>
                   <!-- Botón para compartir fotos -->
                   <button
                     v-if="orden.estado === 'completada'"
                     @click="compartirFotosWhatsApp(orden)"
                     class="p-2 text-blue-600 hover:text-blue-800 transition-colors"
-                    title="Compartir fotos del trabajo"
+                  title="Compartir fotos del trabajo"
+                  :aria-label="`Compartir fotos de la orden ${orden.numeroOrden}`"
                   >
-                    <Share2 class="h-4 w-4" />
+                    <Share2 class="h-4 w-4" aria-hidden="true" />
                   </button>
                   <button
                     @click="generarYSubirPDF(orden)"
                     class="p-2 text-blue-600 hover:text-blue-800 transition-colors"
-                    title="Generar PDF y subir a Google Drive"
+                  title="Generar PDF y subir a Google Drive"
+                  :aria-label="`Generar PDF de la orden ${orden.numeroOrden}`"
                   >
-                    <FileText class="h-4 w-4" />
+                    <FileText class="h-4 w-4" aria-hidden="true" />
                   </button>
                   <button
                     @click="editarOrden(orden)"
                     class="p-2 text-gray-600 hover:text-gray-800 transition-colors"
-                    title="Editar orden"
+                  title="Editar orden"
+                  :aria-label="`Editar orden ${orden.numeroOrden}`"
                   >
-                    <Edit2 class="h-4 w-4" />
+                    <Edit2 class="h-4 w-4" aria-hidden="true" />
                   </button>
                   <button
                     @click="eliminarOrdenConfirm(orden.id)"
                     class="p-2 text-red-600 hover:text-red-800 transition-colors"
-                    title="Eliminar orden"
+                  title="Eliminar orden"
+                  :aria-label="`Eliminar orden ${orden.numeroOrden}`"
                   >
-                    <Trash2 class="h-4 w-4" />
+                    <Trash2 class="h-4 w-4" aria-hidden="true" />
                   </button>
                 </div>
               </td>
@@ -227,17 +212,17 @@
         <div v-if="ordenesFiltradas.length === 0" class="text-center py-12">
           <FileText class="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 class="text-lg font-medium text-gray-900 mb-2">
-            {{ hayFiltros ? 'No se encontraron órdenes' : 'No hay órdenes de mantenimiento' }}
+            {{ hayFiltros ? 'No se encontraron órdenes' : vehiculos.length === 0 ? 'Primero registrá un vehículo' : 'No hay órdenes de mantenimiento' }}
           </h3>
           <p class="text-gray-500 mb-6">
-            {{ hayFiltros ? 'Intenta con otros filtros' : 'Comienza creando tu primera orden' }}
+            {{ hayFiltros ? 'Intenta con otros filtros' : vehiculos.length === 0 ? 'La orden necesita un vehículo y un cliente asociados.' : 'Creá una orden para organizar el trabajo pendiente.' }}
           </p>
           <button
             v-if="!hayFiltros"
-            @click="mostrarFormulario = true"
+            @click="vehiculos.length === 0 ? router.push('/vehiculos') : (mostrarFormulario = true)"
             class="btn-primary"
           >
-            Crear Primera Orden
+            {{ vehiculos.length === 0 ? 'Ir a Vehículos' : 'Crear Primera Orden' }}
           </button>
         </div>
       </div>
@@ -247,20 +232,24 @@
     <div
       v-if="mostrarFormulario"
       class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      @click.self="cancelarFormulario"
+      @keydown.esc="cancelarFormulario"
     >
-      <div class="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-        <h2 class="text-xl font-bold text-gray-900 mb-4">
+      <div v-focus-trap class="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="order-form-title" tabindex="-1">
+        <h2 id="order-form-title" class="text-xl font-bold text-gray-900 mb-4">
           {{ ordenEditando ? 'Editar Orden' : 'Nueva Orden de Mantenimiento' }}
         </h2>
 
         <form @submit.prevent="guardarOrden" class="space-y-4">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
+              <label for="order-vehicle" class="block text-sm font-medium text-gray-700 mb-1">
                 Vehículo *
               </label>
               <select
                 v-model="formulario.vehiculoId"
+                id="order-vehicle"
+                autofocus
                 @change="onVehiculoChange"
                 required
                 class="input-field"
@@ -273,11 +262,12 @@
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
+              <label for="order-client" class="block text-sm font-medium text-gray-700 mb-1">
                 Cliente
               </label>
               <input
                 :value="clienteSeleccionado?.nombre || ''"
+                id="order-client"
                 type="text"
                 readonly
                 class="input-field bg-gray-50"
@@ -288,11 +278,12 @@
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
+              <label for="order-status" class="block text-sm font-medium text-gray-700 mb-1">
                 Estado *
               </label>
               <select
                 v-model="formulario.estado"
+                id="order-status"
                 required
                 class="input-field"
               >
@@ -304,11 +295,12 @@
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
+              <label for="order-priority" class="block text-sm font-medium text-gray-700 mb-1">
                 Prioridad *
               </label>
               <select
                 v-model="formulario.prioridad"
+                id="order-priority"
                 required
                 class="input-field"
               >
@@ -320,11 +312,12 @@
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
+              <label for="order-due-date" class="block text-sm font-medium text-gray-700 mb-1">
                 Fecha de Vencimiento
               </label>
               <input
                 v-model="formulario.fechaVencimiento"
+                id="order-due-date"
                 type="date"
                 class="input-field"
               />
@@ -332,11 +325,12 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label for="order-estimate" class="block text-sm font-medium text-gray-700 mb-1">
               Presupuesto Estimado ($)
             </label>
             <input
               v-model="formulario.costoEstimado"
+              id="order-estimate"
               type="number"
               min="0"
               step="0.01"
@@ -346,11 +340,12 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label for="order-description" class="block text-sm font-medium text-gray-700 mb-1">
               Descripción del Trabajo *
             </label>
             <textarea
               v-model="formulario.descripcionTrabajo"
+              id="order-description"
               class="input-field"
               rows="4"
               required
@@ -359,11 +354,12 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label for="order-observations" class="block text-sm font-medium text-gray-700 mb-1">
               Observaciones
             </label>
             <textarea
               v-model="formulario.observaciones"
+              id="order-observations"
               class="input-field"
               rows="3"
               placeholder="Observaciones adicionales..."
@@ -423,8 +419,10 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { 
   Plus, 
+  Car,
   FileText, 
   Edit2, 
   Trash2, 
@@ -464,6 +462,7 @@ const {
 const { generarPDFOrden } = usePDF()
 const { initializeGoogleDrive, authenticateUser, subirOrdenAGoogleDrive, estaAutenticado, getDebugInfo, diagnosticarProblemas } = useGoogleDrive()
 const { success, error } = useNotifications()
+const router = useRouter()
 
 // Estado del componente
 const mostrarFormulario = ref(false)
@@ -604,13 +603,10 @@ const guardarOrden = () => {
     fechaVencimiento: formulario.value.fechaVencimiento || null
   }
 
-  if (ordenEditando.value) {
-    actualizarOrden(ordenEditando.value.id, datosOrden)
-  } else {
-    crearOrden(datosOrden)
-  }
-  
-  cancelarFormulario()
+  const resultado = ordenEditando.value
+    ? actualizarOrden(ordenEditando.value.id, datosOrden)
+    : crearOrden(datosOrden)
+  if (resultado) cancelarFormulario()
 }
 
 const cancelarFormulario = () => {

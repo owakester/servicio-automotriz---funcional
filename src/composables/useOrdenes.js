@@ -4,7 +4,7 @@ import { useNotifications } from './useNotifications'
 
 export const useOrdenes = () => {
   const { ordenes, obtenerVehiculoPorId, obtenerClientePorId, agregarOrden, actualizarOrden: actualizarOrdenService, eliminarOrden: eliminarOrdenService } = useAutoService()
-  const { success, error } = useNotifications()
+  const { error } = useNotifications()
 
   // Generar número de orden automático
   const generarNumeroOrden = () => {
@@ -34,7 +34,6 @@ export const useOrdenes = () => {
     }
 
     const ordenCreada = agregarOrden(nuevaOrden)
-    success(`Orden ${nuevaOrden.numeroOrden} creada exitosamente`)
     return ordenCreada
   }
 
@@ -52,9 +51,6 @@ export const useOrdenes = () => {
     const orden = ordenes.value.find(o => o.id === id)
     if (orden) {
       const resultado = eliminarOrdenService(id)
-      if (resultado) {
-        success(`Orden ${orden.numeroOrden} eliminada`)
-      }
       return resultado
     }
     error('Orden no encontrada')
@@ -76,9 +72,6 @@ export const useOrdenes = () => {
       }
       
       const ordenActualizada = actualizarOrdenService(id, datosActualizados)
-      if (ordenActualizada) {
-        success(`Orden ${orden.numeroOrden} marcada como ${nuevoEstado}`)
-      }
       return ordenActualizada
     }
     error('Orden no encontrada')

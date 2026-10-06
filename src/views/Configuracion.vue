@@ -22,6 +22,9 @@
                 <p class="text-xs text-blue-700">
                   {{ estaAutenticado() ? 'Tus backups pueden guardarse automáticamente en la nube' : 'Conecta para habilitar backup automático en la nube' }}
                 </p>
+                <p v-if="copiaNubePendiente" class="text-xs font-medium text-amber-700 mt-1">
+                  Hay una copia pendiente de subir. Se reintentará cuando vuelvas a conectar Drive.
+                </p>
               </div>
             </div>
             <button
@@ -35,34 +38,45 @@
           </div>
         </div>
 
-        <!-- Backup Automático Local -->
+        <!-- Protección local automática -->
         <div class="border-b pb-6">
-          <div class="flex items-center justify-between mb-4">
+          <div class="flex items-start justify-between gap-4">
             <div>
-              <h3 class="text-lg font-medium text-gray-900">Backup Automático Local</h3>
-              <p class="text-sm text-gray-600">Crear respaldos locales automáticamente según el intervalo configurado</p>
-            </div>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input
-                v-model="backupAutomatico"
-                type="checkbox"
-                class="sr-only peer"
+              <h3 class="text-lg font-medium text-gray-900">Protección Local Automática</h3>
+              <p class="text-sm text-gray-600">
+                Se guardan silenciosamente las últimas 3 copias cada vez que cambian los datos.
+              </p>
+              <p
+                class="text-sm mt-2"
+                :class="estadoRecuperacion === 'advertencia' ? 'text-red-700' : 'text-green-700'"
               >
-              <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-            </label>
+                {{ mensajeRecuperacion }}
+              </p>
+            </div>
+            <span
+              class="px-3 py-1 rounded-full text-xs font-medium"
+              :class="estadoRecuperacion === 'advertencia' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'"
+            >
+              {{ estadoRecuperacion === 'advertencia' ? 'Revisar' : 'Activa' }}
+            </span>
           </div>
-          
-          <div v-if="backupAutomatico" class="ml-4">
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              Intervalo de backup (horas)
-            </label>
-            <select v-model="intervaloBackup" class="input-field w-32">
-              <option :value="6">6 horas</option>
-              <option :value="12">12 horas</option>
-              <option :value="24">24 horas</option>
-              <option :value="48">48 horas</option>
-              <option :value="168">1 semana</option>
-            </select>
+        </div>
+
+        <div
+          v-if="requiereCopiaExterna"
+          class="bg-amber-50 border border-amber-200 rounded-lg p-4"
+          role="status"
+        >
+          <div class="flex items-start gap-3">
+            <AlertTriangle class="h-5 w-5 text-amber-600 mt-0.5" aria-hidden="true" />
+            <div>
+              <h3 class="text-sm font-medium text-amber-900">Conviene crear una copia externa</h3>
+              <p class="text-sm text-amber-800 mt-1">
+                {{ ultimoBackupGoogleDrive
+                  ? 'La última copia de Google Drive tiene más de 7 días.'
+                  : 'Todavía no hay una copia fuera de esta computadora.' }}
+              </p>
+            </div>
           </div>
         </div>
         
@@ -85,6 +99,19 @@
               <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
             </label>
           </div>
+          <div v-if="backupAutomaticoGoogleDrive" class="ml-7">
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              Frecuencia de la copia externa
+            </label>
+            <select v-model="intervaloBackup" class="input-field w-40">
+              <option :value="6">Cada 6 horas</option>
+              <option :value="12">Cada 12 horas</option>
+              <option :value="24">Una vez al día</option>
+              <option :value="48">Cada 2 días</option>
+              <option :value="168">Una vez por semana</option>
+            </select>
+            <p class="text-xs text-gray-500 mt-2">Drive conserva solamente la copia más reciente y la anterior.</p>
+          </div>
         </div>
         
         <!-- Información de últimos backups -->
@@ -93,19 +120,19 @@
             <!-- Último backup local -->
             <div>
               <div class="flex items-center justify-between mb-2">
-                <p class="text-sm font-medium text-gray-700">Último backup local</p>
+                <p class="text-sm font-medium text-gray-700">Última copia local</p>
 <button
   @click="crearBackupLocalAhora"
   :disabled="subiendoLocal"
   class="btn-primary text-sm flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
 >
-  <Download class="h-3 w-3 mr-1" />
-  <span>{{ subiendoLocal ? 'Creando…' : 'Crear Ahora' }}</span>
+  <RefreshCw class="h-3 w-3 mr-1" :class="{ 'animate-spin': subiendoLocal }" aria-hidden="true" />
+  <span>{{ subiendoLocal ? 'Guardando…' : 'Guardar copia' }}</span>
 </button>
 
               </div>
               <p class="text-sm text-gray-600">
-                {{ ultimoBackup ? new Date(ultimoBackup).toLocaleString('es-ES') : 'Nunca' }}
+                {{ ultimoSnapshotLocal ? new Date(ultimoSnapshotLocal).toLocaleString('es-AR') : 'Preparando primera copia...' }}
               </p>
             </div>
             
@@ -137,8 +164,8 @@
         <!-- Acciones de Backup -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div class="border rounded-lg p-4">
-            <h4 class="font-medium text-gray-900 mb-2">Restaurar Backup Local</h4>
-            <p class="text-sm text-gray-600 mb-4">Cargar un archivo de backup desde tu dispositivo</p>
+            <h4 class="font-medium text-gray-900 mb-2">Importar backup desde archivo</h4>
+            <p class="text-sm text-gray-600 mb-4">Reemplaza los datos actuales por una copia JSON que hayas guardado.</p>
             <input
               ref="fileInput"
               type="file"
@@ -205,118 +232,26 @@
       </div>
     </div>
     
-    <!-- 🆕 NUEVA SECCIÓN: REPORTES CSV AVANZADOS -->
-    <div class="card">
-      <h2 class="text-xl font-semibold text-gray-900 mb-6 flex items-center">
-        <Database class="h-6 w-6 mr-2 text-green-600" />
-        Reportes CSV Avanzados
-      </h2>
-      
-      <div class="space-y-6">
-        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-          <div class="flex items-center mb-2">
-            <Database class="h-5 w-5 text-green-600 mr-2" />
-            <h3 class="text-sm font-medium text-green-900">Exportación Completa de Reportes</h3>
-          </div>
-          <p class="text-xs text-green-700 mb-4">
-            Genera automáticamente 7 reportes detallados en formato CSV con estadísticas avanzadas
-          </p>
-          <div class="grid grid-cols-2 gap-2 text-xs text-green-700">
-            <div>• Clientes con historial</div>
-            <div>• Vehículos con servicios</div>
-            <div>• Servicios del último año</div>
-            <div>• Órdenes completas</div>
-            <div>• Ingresos por tipo</div>
-            <div>• Vehículos por marca</div>
-            <div>• Estadísticas anuales</div>
-            <div></div>
-          </div>
-        </div>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <!-- Descargar reportes localmente -->
-          <div class="border rounded-lg p-4">
-            <h4 class="font-medium text-gray-900 mb-2 flex items-center">
-              <Download class="h-4 w-4 mr-2 text-gray-600" />
-              Descargar Reportes Localmente
-            </h4>
-            <p class="text-sm text-gray-600 mb-4">
-              Genera y descarga todos los reportes CSV a tu dispositivo
-            </p>
-            <button
-              @click="descargarReportesCSVLocal"
-              class="btn-primary w-full flex items-center justify-center"
-            >
-              <Download class="h-4 w-4 mr-2" />
-              Descargar 7 Reportes CSV
-            </button>
-          </div>
-          
-          <!-- Subir reportes a Google Drive -->
-          <div v-if="estaAutenticado()" class="border rounded-lg p-4 bg-green-50 border-green-200">
-            <h4 class="font-medium text-gray-900 mb-2 flex items-center">
-              <Cloud class="h-4 w-4 mr-2 text-green-600" />
-              Subir Reportes a Google Drive
-            </h4>
-            <p class="text-sm text-gray-600 mb-4">
-              Genera y sube todos los reportes CSV a tu carpeta de Google Drive
-            </p>
-            <button
-              @click="exportarReportesCSVAGoogleDrive"
-              class="bg-green-600 hover:bg-green-700 text-white w-full px-4 py-2 rounded flex items-center justify-center transition-colors"
-            >
-              <Cloud class="h-4 w-4 mr-2" />
-              Subir 7 Reportes CSV
-            </button>
-          </div>
-          
-          <!-- Mensaje cuando no está autenticado -->
-          <div v-else class="border rounded-lg p-4 bg-gray-50 border-gray-200">
-            <h4 class="font-medium text-gray-500 mb-2 flex items-center">
-              <Cloud class="h-4 w-4 mr-2 text-gray-400" />
-              Subir Reportes a Google Drive
-            </h4>
-            <p class="text-sm text-gray-500 mb-4">
-              Conecta Google Drive para subir reportes automáticamente
-            </p>
-            <button
-              @click="conectarGoogleDrive"
-              class="btn-secondary w-full flex items-center justify-center"
-            >
-              <Cloud class="h-4 w-4 mr-2" />
-              Conectar Google Drive
-            </button>
-          </div>
-        </div>
-        
-        <div class="border-t pt-4">
-          <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p class="text-sm text-blue-800">
-              <strong>Nota:</strong> Los reportes CSV incluyen datos enriquecidos como estadísticas de clientes, 
-              historial de servicios por vehículo, análisis de ingresos y más. Son ideales para análisis 
-              detallados en Excel, Google Sheets o herramientas de Business Intelligence.
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-    
     <!-- 🆕 MODAL DE BACKUPS EN GOOGLE DRIVE -->
     <div
       v-if="mostrarBackupsGoogleDrive"
       class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      @click.self="mostrarBackupsGoogleDrive = false"
+      @keydown.esc="mostrarBackupsGoogleDrive = false"
     >
-      <div class="bg-white rounded-lg p-6 w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
+      <div v-focus-trap class="bg-white rounded-lg p-6 w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="cloud-backups-title" tabindex="-1">
         <div class="flex justify-between items-center mb-6">
-          <h2 class="text-xl font-bold text-gray-900 flex items-center">
+          <h2 id="cloud-backups-title" class="text-xl font-bold text-gray-900 flex items-center">
             <Cloud class="h-6 w-6 mr-2 text-blue-600" />
             Backups en Google Drive
           </h2>
           <button
+            type="button"
             @click="mostrarBackupsGoogleDrive = false"
             class="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+            aria-label="Cerrar backups de Google Drive"
           >
-            <X class="h-6 w-6" />
+            <X class="h-6 w-6" aria-hidden="true" />
           </button>
         </div>
         
@@ -406,48 +341,6 @@
       </div>
     </div>
     
-    <!-- Sección de Rendimiento -->
-    <div class="card">
-      <h2 class="text-xl font-semibold text-gray-900 mb-6 flex items-center">
-        <Zap class="h-6 w-6 mr-2 text-primary-600" />
-        Optimización y Rendimiento
-      </h2>
-      
-      <div class="space-y-4">
-        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p class="text-sm text-blue-800">
-            <strong>Modo de Aplicación Local:</strong> Esta aplicación está optimizada para funcionar 
-            completamente offline sin necesidad de conexión a internet (excepto para Google Drive).
-          </p>
-        </div>
-        
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div class="text-center p-4 bg-gray-50 rounded-lg">
-            <div class="text-2xl font-bold text-primary-600">{{ estadisticas.totalRegistros }}</div>
-            <div class="text-sm text-gray-600">Total de Registros</div>
-          </div>
-          <div class="text-center p-4 bg-gray-50 rounded-lg">
-            <div class="text-2xl font-bold text-primary-600">{{ tamanoEstimado }}</div>
-            <div class="text-sm text-gray-600">Uso de Almacenamiento</div>
-          </div>
-          <div class="text-center p-4 bg-gray-50 rounded-lg">
-            <div class="text-2xl font-bold text-primary-600">{{ rendimiento }}ms</div>
-            <div class="text-sm text-gray-600">Tiempo de Carga</div>
-          </div>
-        </div>
-        
-        <div class="border-t pt-4">
-          <button
-            @click="limpiarCache"
-            class="btn-secondary flex items-center"
-          >
-            <Trash2 class="h-4 w-4 mr-2" />
-            Limpiar Caché de Navegador
-          </button>
-        </div>
-      </div>
-    </div>
-    
     <!-- Sección de Información -->
     <div class="card">
       <h2 class="text-xl font-semibold text-gray-900 mb-6 flex items-center">
@@ -460,18 +353,10 @@
           <p class="text-sm text-gray-600">Versión</p>
           <p class="font-medium">1.0.0</p>
         </div>
-        <div>
-          <p class="text-sm text-gray-600">Desarrollado por</p>
-          <p class="font-medium">Tu Empresa</p>
-        </div>
-        <div>
-          <p class="text-sm text-gray-600">Tecnologías</p>
-          <p class="font-medium">Vue 3, Vite, Tailwind CSS</p>
-        </div>
         <div class="pt-4 border-t">
           <p class="text-sm text-gray-600">
-            Esta aplicación almacena todos los datos localmente en tu navegador. 
-            Recuerda hacer backups periódicos para evitar pérdida de información.
+            Esta aplicación guarda los datos en este navegador y conserva tres copias locales de recuperación.
+            Para protegerte ante una falla de la computadora, mantén también conectado Google Drive.
           </p>
         </div>
       </div>
@@ -480,16 +365,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { Database, Download, Upload, Zap, Info, Trash2, Cloud, RefreshCw, Eye, X } from 'lucide-vue-next'
+import { ref, computed } from 'vue'
+import { Database, Upload, Cloud, RefreshCw, Eye, X, AlertTriangle } from 'lucide-vue-next'
 import { useBackupSystem } from '../composables/useBackupSystem'
 import { useAutoService } from '../composables/useAutoService'
 import { useNotifications } from '../composables/useNotifications'
 import { useGoogleDrive } from '../composables/useGoogleDrive'
+import { useDataRecovery } from '../composables/useDataRecovery'
 
-// al inicio, junto a los otros `import`
-import { AlertTriangle } from 'lucide-vue-next'
-import { useProximosServicios } from '../composables/useProximosServicios'
 
 // ⬇️ nuevos flags de UI
 const subiendoNube = ref(false)
@@ -501,14 +384,7 @@ const crearBackupConGoogleDrive = async () => {
   if (subiendoNube.value) return
   subiendoNube.value = true
   try {
-    // tu sistema ya hace todo si le pasás true
-    const r = await crearBackup(true)
-
-    // si tu useBackupSystem ya setea ultimoBackupGoogleDrive, no hace falta esto:
-    if (!ultimoBackupGoogleDrive.value && (r?.success || r === true)) {
-      ultimoBackupGoogleDrive.value = new Date().toISOString()
-      localStorage.setItem('ultimoBackupGoogleDrive', ultimoBackupGoogleDrive.value)
-    }
+    await crearBackup(true)
   } catch (e) {
     console.error(e)
   } finally {
@@ -534,8 +410,9 @@ const conectarGoogleDrive = async () => {
   if (conectandoGD.value || estaAutenticado()) return
   conectandoGD.value = true
   try {
-    await initializeGoogleDrive()
-    await authenticateUser()
+    const inicializado = await initializeGoogleDrive()
+    const autenticado = inicializado && await authenticateUser()
+    if (autenticado) backupGoogleDrive.value = true
   } catch (error) {
     console.error('Error al conectar Google Drive:', error)
   } finally {
@@ -545,9 +422,9 @@ const conectarGoogleDrive = async () => {
 
 const { success, info: showInfo, error: showError } = useNotifications()
 const { clientes, vehiculos, servicios, ordenes } = useAutoService()
+const { estadoRecuperacion, mensajeRecuperacion } = useDataRecovery()
 const {
-  ultimoBackup,
-  backupAutomatico,
+  ultimoSnapshotLocal,
   intervaloBackup,
   crearBackup,
   restaurarBackup,
@@ -556,20 +433,16 @@ const {
   backupGoogleDrive,
   backupAutomaticoGoogleDrive,
   ultimoBackupGoogleDrive,
+  copiaNubePendiente,
   backupsEnLaNube,
   cargarBackupsDeGoogleDrive,
   restaurarBackupDeGoogleDrive,
-  eliminarBackupDeGoogleDrive,
-  // 🆕 FUNCIONES DE REPORTES CSV
-  exportarTodosLosReportesCSV,
-  descargarTodosLosReportesCSV
+  eliminarBackupDeGoogleDrive
 } = useBackupSystem()
 
 // 🆕 GOOGLE DRIVE
 const { estaAutenticado, initializeGoogleDrive, authenticateUser } = useGoogleDrive()
 
-// Estado local
-const rendimiento = ref(0)
 // 🆕 NUEVOS ESTADOS LOCALES
 const mostrarBackupsGoogleDrive = ref(false)
 const cargandoBackups = ref(false)
@@ -579,6 +452,13 @@ const estadisticas = computed(() => ({
   totalRegistros: clientes.value.length + vehiculos.value.length + 
                   servicios.value.length + ordenes.value.length
 }))
+
+const requiereCopiaExterna = computed(() => {
+  if (!ultimoBackupGoogleDrive.value) return true
+  const fecha = new Date(ultimoBackupGoogleDrive.value).getTime()
+  if (Number.isNaN(fecha)) return true
+  return Date.now() - fecha > 7 * 24 * 60 * 60 * 1000
+})
 
 const tamanoEstimado = computed(() => {
   const totalSize = JSON.stringify({
@@ -657,34 +537,6 @@ const eliminarDeGoogleDrive = async (backup) => {
   }
 }
 
-// 🆕 NUEVAS FUNCIONES PARA REPORTES CSV
-const exportarReportesCSVAGoogleDrive = async () => {
-  await exportarTodosLosReportesCSV()
-}
-
-const descargarReportesCSVLocal = () => {
-  descargarTodosLosReportesCSV()
-}
-
-// 🆕 FUNCIÓN DE DEBUG TEMPORAL
-const testearFuncionesBackup = async () => {
-  console.log('🧪 INICIANDO TEST DE FUNCIONES DE BACKUP...')
-  
-  console.log('1. Verificando autenticación...')
-  const auth = estaAutenticado()
-  console.log('Autenticado:', auth)
-  
-  if (auth) {
-    console.log('2. Probando cargarBackupsDeGoogleDrive directamente...')
-    try {
-      const backups = await cargarBackupsDeGoogleDrive()
-      console.log('Resultado directo:', backups)
-    } catch (error) {
-      console.error('Error en test directo:', error)
-    }
-  }
-}
-
 // Métodos
 const handleFileSelect = async (event) => {
   const file = event.target.files[0]
@@ -699,37 +551,4 @@ const handleFileSelect = async (event) => {
   event.target.value = ''
 }
 
-const limpiarCache = () => {
-  if (confirm('¿Estás seguro de limpiar la caché? Esto recargará la aplicación.')) {
-    // Limpiar caché del navegador
-    if ('caches' in window) {
-      caches.keys().then(names => {
-        names.forEach(name => {
-          caches.delete(name)
-        })
-      })
-    }
-    
-    // Recargar la página
-    showInfo('Limpiando caché...')
-    setTimeout(() => {
-      window.location.reload(true)
-    }, 1000)
-  }
-}
-
-// Medir rendimiento al cargar
-onMounted(() => {
-  const startTime = performance.now()
-  // Simular carga de datos
-  setTimeout(() => {
-    rendimiento.value = Math.round(performance.now() - startTime)
-  }, 100)
-  
- 
-  console.log('🆕 Funciones de debug disponibles en window.debugBackup')
-})
-
-// ... debajo de los otros `use` composables
-const { descargarCSVLocal: descargarProximosServiciosCSV } = useProximosServicios()
 </script>

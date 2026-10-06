@@ -1,9 +1,9 @@
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div class="flex justify-between items-center">
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
       <h1 class="text-3xl font-bold text-gray-900">Reportes</h1>
-      <div class="flex space-x-2">
+      <div v-if="hayDatos" class="flex flex-wrap gap-2">
         <button
           @click="exportarServicios(filtros.fechaInicio, filtros.fechaFin)"
           class="btn-secondary flex items-center"
@@ -21,25 +21,34 @@
       </div>
     </div>
 
+    <div v-if="!hayDatos" class="card text-center py-12">
+      <BarChart3 class="h-12 w-12 text-gray-400 mx-auto mb-4" aria-hidden="true" />
+      <h2 class="text-lg font-semibold text-gray-900 mb-2">Todavía no hay datos para reportar</h2>
+      <p class="text-gray-500 mb-6">Los reportes aparecerán cuando registres clientes, vehículos y servicios.</p>
+      <router-link to="/clientes" class="btn-primary inline-flex">Comenzar por Clientes</router-link>
+    </div>
+
     <!-- Filtros de Fecha -->
-    <BaseCard title="Filtros de Período">
+    <BaseCard v-if="hayDatos" title="Filtros de Período">
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">
+          <label for="report-start-date" class="block text-sm font-medium text-gray-700 mb-1">
             Fecha Inicio
           </label>
           <input
             v-model="filtros.fechaInicio"
+            id="report-start-date"
             type="date"
             class="input-field"
           />
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">
+          <label for="report-end-date" class="block text-sm font-medium text-gray-700 mb-1">
             Fecha Fin
           </label>
           <input
             v-model="filtros.fechaFin"
+            id="report-end-date"
             type="date"
             class="input-field"
           />
@@ -56,7 +65,7 @@
     </BaseCard>
 
     <!-- Estadísticas del Período -->
-    <BaseCard title="Resumen del Período" v-if="datosPeriodo">
+    <BaseCard title="Resumen del Período" v-if="hayDatos && datosPeriodo">
       <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div class="text-center">
           <div class="text-3xl font-bold text-primary-600">
@@ -86,7 +95,7 @@
     </BaseCard>
 
     <!-- Ingresos por Tipo de Servicio -->
-    <BaseCard title="Ingresos por Tipo de Servicio" v-if="datosPeriodo">
+    <BaseCard title="Ingresos por Tipo de Servicio" v-if="hayDatos && datosPeriodo && datosPeriodo.cantidadServicios > 0">
       <div class="overflow-x-auto">
         <table class="table">
           <thead class="bg-gray-50">
@@ -112,7 +121,7 @@
     </BaseCard>
 
     <!-- Clientes Más Frecuentes -->
-    <BaseCard title="Top 10 Clientes Más Frecuentes">
+    <BaseCard v-if="clientesFrecuentes.length > 0" title="Top 10 Clientes Más Frecuentes">
       <div class="overflow-x-auto">
         <table class="table">
           <thead class="bg-gray-50">
@@ -143,7 +152,7 @@
     </BaseCard>
 
     <!-- Vehículos por Marca/Modelo -->
-    <BaseCard title="Vehículos por Marca y Modelo">
+    <BaseCard v-if="vehiculosPorMarca.length > 0" title="Vehículos por Marca y Modelo">
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div
           v-for="grupo in vehiculosPorMarca"
@@ -164,7 +173,7 @@
     </BaseCard>
 
     <!-- Estadísticas Anuales -->
-    <BaseCard title="Estadísticas del Año Actual">
+    <BaseCard v-if="servicios.length > 0" title="Estadísticas del Año Actual">
       <div class="space-y-4">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <!-- Gráfico de Servicios por Mes -->
@@ -216,9 +225,10 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { Download } from 'lucide-vue-next'
+import { BarChart3, Download } from 'lucide-vue-next'
 import BaseCard from '../components/BaseCard.vue'
 import { useReports } from '../composables/useReports'
+import { useAutoService } from '../composables/useAutoService'
 
 const {
   getIngresosPorPeriodo,
@@ -228,6 +238,7 @@ const {
   exportarServicios,
   exportarClientes
 } = useReports()
+const { clientes, vehiculos, servicios } = useAutoService()
 
 // Estado
 const filtros = ref({
@@ -236,6 +247,7 @@ const filtros = ref({
 })
 
 const datosPeriodo = ref(null)
+const hayDatos = computed(() => clientes.value.length > 0 || vehiculos.value.length > 0 || servicios.value.length > 0)
 
 // Computed
 const clientesFrecuentes = computed(() => getClientesFrecuentes(10))

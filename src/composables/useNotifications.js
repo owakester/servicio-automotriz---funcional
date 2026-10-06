@@ -1,7 +1,28 @@
 import { ref, computed } from 'vue'
 
+const leerLocalSeguro = (clave) => {
+  try { return localStorage.getItem(clave) }
+  catch { return null }
+}
+const guardarLocalSeguro = (clave, valor) => {
+  try { localStorage.setItem(clave, valor) }
+  catch { /* Las notificaciones siguen disponibles durante la sesión. */ }
+}
+const eliminarLocalSeguro = (clave) => {
+  try { localStorage.removeItem(clave) }
+  catch { /* Sin almacenamiento persistente no hay nada que limpiar. */ }
+}
+const cargarHistorial = () => {
+  try {
+    const historial = JSON.parse(leerLocalSeguro('notificationHistory') || '[]')
+    return Array.isArray(historial) ? historial : []
+  } catch {
+    return []
+  }
+}
+
 const notifications = ref([])
-const notificationHistory = ref(JSON.parse(localStorage.getItem('notificationHistory') || '[]'))
+const notificationHistory = ref(cargarHistorial())
 
 export const useNotifications = () => {
   const addNotification = (notification) => {
@@ -20,7 +41,7 @@ export const useNotifications = () => {
       if (notificationHistory.value.length > 50) {
         notificationHistory.value = notificationHistory.value.slice(0, 50)
       }
-      localStorage.setItem('notificationHistory', JSON.stringify(notificationHistory.value))
+      guardarLocalSeguro('notificationHistory', JSON.stringify(notificationHistory.value))
     }
     
     // Auto-eliminar después de 5 segundos si no es persistente
@@ -40,7 +61,7 @@ export const useNotifications = () => {
 
   const clearHistory = () => {
     notificationHistory.value = []
-    localStorage.removeItem('notificationHistory')
+    eliminarLocalSeguro('notificationHistory')
   }
 
   const success = (message, options = {}) => {
@@ -78,7 +99,7 @@ export const useNotifications = () => {
 
   // Notificaciones no leídas
   const unreadCount = computed(() => {
-    const lastRead = localStorage.getItem('lastNotificationRead')
+    const lastRead = leerLocalSeguro('lastNotificationRead')
     if (!lastRead) return notificationHistory.value.length
     
     return notificationHistory.value.filter(n => 
@@ -87,7 +108,7 @@ export const useNotifications = () => {
   })
 
   const markAllAsRead = () => {
-    localStorage.setItem('lastNotificationRead', new Date().toISOString())
+    guardarLocalSeguro('lastNotificationRead', new Date().toISOString())
   }
 
   return {

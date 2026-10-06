@@ -20,6 +20,7 @@
           :value="itemsPerPage"
           @change="$emit('update:itemsPerPage', parseInt($event.target.value))"
           class="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+          aria-label="Resultados por página"
         >
           <option :value="5">5</option>
           <option :value="10">10</option>
@@ -34,31 +35,31 @@
         <!-- Primera página -->
         <button
           @click="firstPage"
-          :disabled="currentPage === 1"
+          :disabled="currentPage === 1 || totalPages === 0"
           :class="[
             'p-2 rounded-lg transition-colors',
-            currentPage === 1
+            currentPage === 1 || totalPages === 0
               ? 'text-gray-300 cursor-not-allowed'
               : 'text-gray-600 hover:bg-gray-100'
           ]"
           :aria-label="'Primera página'"
         >
-          <ChevronFirst class="h-4 w-4" />
+          <ChevronFirst class="h-4 w-4" aria-hidden="true" />
         </button>
         
         <!-- Página anterior -->
         <button
           @click="prevPage"
-          :disabled="currentPage === 1"
+          :disabled="currentPage === 1 || totalPages === 0"
           :class="[
             'p-2 rounded-lg transition-colors',
-            currentPage === 1
+            currentPage === 1 || totalPages === 0
               ? 'text-gray-300 cursor-not-allowed'
               : 'text-gray-600 hover:bg-gray-100'
           ]"
           :aria-label="'Página anterior'"
         >
-          <ChevronLeft class="h-4 w-4" />
+          <ChevronLeft class="h-4 w-4" aria-hidden="true" />
         </button>
         
         <!-- Números de página -->
@@ -99,37 +100,37 @@
         
         <!-- Indicador móvil -->
         <div class="sm:hidden px-3 py-1 text-sm text-gray-700">
-          {{ currentPage }} / {{ totalPages }}
+          {{ totalPages === 0 ? 0 : currentPage }} / {{ totalPages }}
         </div>
         
         <!-- Página siguiente -->
         <button
           @click="nextPage"
-          :disabled="currentPage === totalPages"
+          :disabled="totalPages === 0 || currentPage >= totalPages"
           :class="[
             'p-2 rounded-lg transition-colors',
-            currentPage === totalPages
+            totalPages === 0 || currentPage >= totalPages
               ? 'text-gray-300 cursor-not-allowed'
               : 'text-gray-600 hover:bg-gray-100'
           ]"
           :aria-label="'Página siguiente'"
         >
-          <ChevronRight class="h-4 w-4" />
+          <ChevronRight class="h-4 w-4" aria-hidden="true" />
         </button>
         
         <!-- Última página -->
         <button
           @click="lastPage"
-          :disabled="currentPage === totalPages"
+          :disabled="totalPages === 0 || currentPage >= totalPages"
           :class="[
             'p-2 rounded-lg transition-colors',
-            currentPage === totalPages
+            totalPages === 0 || currentPage >= totalPages
               ? 'text-gray-300 cursor-not-allowed'
               : 'text-gray-600 hover:bg-gray-100'
           ]"
           :aria-label="'Última página'"
         >
-          <ChevronLast class="h-4 w-4" />
+          <ChevronLast class="h-4 w-4" aria-hidden="true" />
         </button>
       </nav>
     </div>

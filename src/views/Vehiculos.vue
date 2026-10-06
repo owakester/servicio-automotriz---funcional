@@ -1,19 +1,24 @@
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div class="flex justify-between items-center">
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
       <h1 class="text-3xl font-bold text-gray-900">Vehículos</h1>
       <button
+        v-if="clientes.length > 0"
         @click="mostrarFormulario = true"
         class="btn-primary flex items-center"
       >
-        <Plus class="h-4 w-4 mr-2" />
+        <Plus class="h-4 w-4 mr-2" aria-hidden="true" />
         Nuevo Vehículo
       </button>
+      <router-link v-else to="/clientes" class="btn-primary inline-flex items-center">
+        <User class="h-4 w-4 mr-2" aria-hidden="true" />
+        Agregar cliente primero
+      </router-link>
     </div>
 
     <!-- Filtros -->
-    <div class="card">
+    <div v-if="vehiculos.length > 0" class="card">
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <input
@@ -98,14 +103,18 @@
             <button
               @click="editarVehiculo(vehiculo)"
               class="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+              :aria-label="`Editar vehículo ${vehiculo.patente}`"
+              :title="`Editar vehículo ${vehiculo.patente}`"
             >
-              <Edit2 class="h-4 w-4" />
+              <Edit2 class="h-4 w-4" aria-hidden="true" />
             </button>
             <button
               @click="eliminarVehiculoConfirm(vehiculo.id)"
               class="p-2 text-gray-400 hover:text-red-600 transition-colors"
+              :aria-label="`Eliminar vehículo ${vehiculo.patente}`"
+              :title="`Eliminar vehículo ${vehiculo.patente}`"
             >
-              <Trash2 class="h-4 w-4" />
+              <Trash2 class="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -186,17 +195,17 @@
     <div v-if="vehiculosFiltrados.length === 0" class="text-center py-12">
       <Car class="h-12 w-12 text-gray-400 mx-auto mb-4" />
       <h3 class="text-lg font-medium text-gray-900 mb-2">
-        {{ filtroTexto || filtroCliente || filtroAlerta ? 'No se encontraron vehículos' : 'No hay vehículos registrados' }}
+        {{ filtroTexto || filtroCliente || filtroAlerta ? 'No se encontraron vehículos' : clientes.length === 0 ? 'Primero registrá un cliente' : 'No hay vehículos registrados' }}
       </h3>
       <p class="text-gray-500 mb-6">
-        {{ filtroTexto || filtroCliente || filtroAlerta ? 'Intenta con otros filtros' : 'Comienza agregando tu primer vehículo' }}
+        {{ filtroTexto || filtroCliente || filtroAlerta ? 'Intenta con otros filtros' : clientes.length === 0 ? 'Todo vehículo debe quedar asociado a su dueño.' : 'Agregá el primer vehículo del taller.' }}
       </p>
       <button
         v-if="!filtroTexto && !filtroCliente && !filtroAlerta"
-        @click="mostrarFormulario = true"
+        @click="clientes.length === 0 ? router.push('/clientes') : (mostrarFormulario = true)"
         class="btn-primary"
       >
-        Agregar Vehículo
+        {{ clientes.length === 0 ? 'Ir a Clientes' : 'Agregar Vehículo' }}
       </button>
     </div>
 
@@ -204,19 +213,23 @@
     <div
       v-if="mostrarFormulario"
       class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      @click.self="cancelarFormulario"
+      @keydown.esc="cancelarFormulario"
     >
-      <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
-        <h2 class="text-xl font-bold text-gray-900 mb-4">
+      <div v-focus-trap class="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="vehicle-form-title" tabindex="-1">
+        <h2 id="vehicle-form-title" class="text-xl font-bold text-gray-900 mb-4">
           {{ vehiculoEditando ? 'Editar Vehículo' : 'Nuevo Vehículo' }}
         </h2>
 
         <form @submit.prevent="guardarVehiculo" class="space-y-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label for="vehicle-client" class="block text-sm font-medium text-gray-700 mb-1">
               Cliente *
             </label>
             <select
               v-model="formulario.clienteId"
+              id="vehicle-client"
+              autofocus
               required
               class="input-field"
             >
@@ -228,11 +241,12 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label for="vehicle-plate" class="block text-sm font-medium text-gray-700 mb-1">
               Patente *
             </label>
             <input
               v-model="formulario.patente"
+              id="vehicle-plate"
               type="text"
               required
               class="input-field"
@@ -243,11 +257,12 @@
 
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
+              <label for="vehicle-brand" class="block text-sm font-medium text-gray-700 mb-1">
                 Marca *
               </label>
               <input
                 v-model="formulario.marca"
+                id="vehicle-brand"
                 type="text"
                 required
                 class="input-field"
@@ -255,11 +270,12 @@
               />
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
+              <label for="vehicle-model" class="block text-sm font-medium text-gray-700 mb-1">
                 Modelo *
               </label>
               <input
                 v-model="formulario.modelo"
+                id="vehicle-model"
                 type="text"
                 required
                 class="input-field"
@@ -270,11 +286,12 @@
 
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
+              <label for="vehicle-year" class="block text-sm font-medium text-gray-700 mb-1">
                 Año *
               </label>
               <input
                 v-model="formulario.anio"
+                id="vehicle-year"
                 type="number"
                 required
                 min="1900"
@@ -284,11 +301,12 @@
               />
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
+              <label for="vehicle-color" class="block text-sm font-medium text-gray-700 mb-1">
                 Color
               </label>
               <input
                 v-model="formulario.color"
+                id="vehicle-color"
                 type="text"
                 class="input-field"
                 placeholder="Blanco"
@@ -297,11 +315,12 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label for="vehicle-mileage" class="block text-sm font-medium text-gray-700 mb-1">
               Kilometraje
             </label>
             <input
               v-model="formulario.kilometraje"
+              id="vehicle-mileage"
               type="number"
               min="0"
               class="input-field"
@@ -310,11 +329,12 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label for="vehicle-engine" class="block text-sm font-medium text-gray-700 mb-1">
               Número de Motor
             </label>
             <input
               v-model="formulario.numeroMotor"
+              id="vehicle-engine"
               type="text"
               class="input-field"
               placeholder="1234567890"
@@ -322,11 +342,12 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label for="vehicle-chassis" class="block text-sm font-medium text-gray-700 mb-1">
               Número de Chasis
             </label>
             <input
               v-model="formulario.numeroChasis"
+              id="vehicle-chassis"
               type="text"
               class="input-field"
               placeholder="ABCD1234567890"
@@ -334,11 +355,12 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label for="vehicle-notes" class="block text-sm font-medium text-gray-700 mb-1">
               Notas
             </label>
             <textarea
               v-model="formulario.notas"
+              id="vehicle-notes"
               class="input-field"
               rows="3"
               placeholder="Notas adicionales sobre el vehículo"
@@ -363,12 +385,23 @@
         </form>
       </div>
     </div>
+
+    <ConfirmDialog
+      :show="mostrarConfirmacion"
+      title="Eliminar Vehículo"
+      :message="`\u00bfEstás seguro de que deseas eliminar el vehículo ${vehiculoAEliminar?.patente}?`"
+      confirm-text="Eliminar"
+      cancel-text="Cancelar"
+      type="danger"
+      @confirm="confirmarEliminarVehiculo"
+      @cancel="cancelarEliminarVehiculo"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { 
   Plus, 
   Car, 
@@ -384,12 +417,16 @@ import {
   MessageCircle
 } from 'lucide-vue-next'
 import { useAutoService } from '../composables/useAutoService'
+import ConfirmDialog from '../components/ConfirmDialog.vue'
+import { useNotifications } from '../composables/useNotifications'
 
 const router = useRouter()
+const route = useRoute()
 
 const {
   clientes,
   vehiculos,
+  ordenes,
   vehiculosConAlertas,
   agregarVehiculo,
   actualizarVehiculo,
@@ -403,8 +440,11 @@ const {
 const mostrarFormulario = ref(false)
 const vehiculoEditando = ref(null)
 const filtroTexto = ref('')
-const filtroCliente = ref('')
+const filtroCliente = ref(route.query.cliente || '')
 const filtroAlerta = ref('')
+const mostrarConfirmacion = ref(false)
+const vehiculoAEliminar = ref(null)
+const { warning } = useNotifications()
 
 // Formulario
 const formulario = ref({
@@ -495,12 +535,10 @@ const guardarVehiculo = () => {
     clienteId: parseInt(formulario.value.clienteId)
   }
 
-  if (vehiculoEditando.value) {
-    actualizarVehiculo(vehiculoEditando.value.id, datosVehiculo)
-  } else {
-    agregarVehiculo(datosVehiculo)
-  }
-  cancelarFormulario()
+  const resultado = vehiculoEditando.value
+    ? actualizarVehiculo(vehiculoEditando.value.id, datosVehiculo)
+    : agregarVehiculo(datosVehiculo)
+  if (resultado) cancelarFormulario()
 }
 
 const cancelarFormulario = () => {
@@ -511,15 +549,25 @@ const cancelarFormulario = () => {
 
 const eliminarVehiculoConfirm = (vehiculoId) => {
   const serviciosVehiculo = obtenerServiciosPorVehiculo(vehiculoId)
+  const ordenesVehiculo = ordenes.value.filter(orden => orden.vehiculoId === vehiculoId)
   
-  if (serviciosVehiculo.length > 0) {
-    alert('No se puede eliminar el vehículo porque tiene servicios asociados.')
+  if (serviciosVehiculo.length > 0 || ordenesVehiculo.length > 0) {
+    warning('No se puede eliminar el vehículo porque tiene servicios u órdenes asociadas.')
     return
   }
   
-  if (confirm('¿Estás seguro de que deseas eliminar este vehículo?')) {
-    eliminarVehiculo(vehiculoId)
-  }
+  vehiculoAEliminar.value = vehiculos.value.find(vehiculo => vehiculo.id === vehiculoId)
+  mostrarConfirmacion.value = true
+}
+
+const confirmarEliminarVehiculo = () => {
+  if (vehiculoAEliminar.value) eliminarVehiculo(vehiculoAEliminar.value.id)
+  cancelarEliminarVehiculo()
+}
+
+const cancelarEliminarVehiculo = () => {
+  mostrarConfirmacion.value = false
+  vehiculoAEliminar.value = null
 }
 
 const verHistorialServicios = (vehiculo) => {

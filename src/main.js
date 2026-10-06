@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import App from './App.vue'
 import './style.css'
 import { useBackupSystem } from './composables/useBackupSystem'
+import { focusTrap } from './directives/focusTrap'
 
 // Dashboard se carga inmediatamente por ser la página principal
 import Dashboard from './views/Dashboard.vue'
@@ -47,6 +48,11 @@ const routes = [
     path: '/configuracion', 
     component: () => import('./views/Configuracion.vue'), 
     name: 'Configuracion' 
+  },
+  {
+    path: '/ayuda',
+    component: () => import('./views/Ayuda.vue'),
+    name: 'Ayuda'
   }
 ]
 
@@ -57,6 +63,7 @@ const router = createRouter({
 
 const app = createApp(App)
 app.use(router)
+app.directive('focus-trap', focusTrap)
 
 // Precargar rutas marcadas como preload
 router.afterEach((to, from) => {

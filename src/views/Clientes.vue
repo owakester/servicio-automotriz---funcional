@@ -1,19 +1,19 @@
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div class="flex justify-between items-center">
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
       <h1 class="text-3xl font-bold text-gray-900">Clientes</h1>
       <button
         @click="mostrarFormulario = true"
         class="btn-primary flex items-center"
       >
-        <Plus class="h-4 w-4 mr-2" />
+        <Plus class="h-4 w-4 mr-2" aria-hidden="true" />
         Nuevo Cliente
       </button>
     </div>
 
     <!-- Filtros con icono de búsqueda -->
-    <div class="card">
+    <div v-if="clientes.length > 0" class="card">
     <div class="flex flex-col sm:flex-row gap-4">
     <div class="flex-1 relative">
     <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -52,14 +52,18 @@
             <button
               @click="editarCliente(cliente)"
               class="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+              :aria-label="`Editar cliente ${cliente.nombre}`"
+              :title="`Editar cliente ${cliente.nombre}`"
             >
-              <Edit2 class="h-4 w-4" />
+              <Edit2 class="h-4 w-4" aria-hidden="true" />
             </button>
             <button
               @click="eliminarClienteConfirm(cliente.id)"
               class="p-2 text-gray-400 hover:text-red-600 transition-colors"
+              :aria-label="`Eliminar cliente ${cliente.nombre}`"
+              :title="`Eliminar cliente ${cliente.nombre}`"
             >
-              <Trash2 class="h-4 w-4" />
+              <Trash2 class="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -74,8 +78,9 @@
               @click="enviarWhatsApp(cliente)"
               class="ml-2 p-1 text-green-500 hover:text-green-700 transition-colors"
               title="Enviar WhatsApp"
+              :aria-label="`Enviar WhatsApp a ${cliente.nombre}`"
             >
-              <MessageCircle class="h-4 w-4" />
+              <MessageCircle class="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
           <div class="flex items-center text-sm text-gray-600">
@@ -106,7 +111,7 @@
     </div>
 
     <!-- Paginación -->
-    <div class="col-span-full mt-6">
+    <div v-if="clientes.length > 0" class="col-span-full mt-6">
       <PaginationControls
         :current-page="currentPage"
         :total-pages="totalPages"
@@ -129,7 +134,7 @@
         {{ filtroTexto ? 'No se encontraron clientes' : 'No hay clientes registrados' }}
       </h3>
       <p class="text-gray-500 mb-6">
-        {{ filtroTexto ? 'Intenta con otros términos de búsqueda' : 'Comienza agregando tu primer cliente' }}
+        {{ filtroTexto ? 'Intenta con otros términos de búsqueda' : 'Empezá por el cliente para luego asociar sus vehículos y trabajos.' }}
       </p>
       <button
         v-if="!filtroTexto"
@@ -144,19 +149,23 @@
     <div
       v-if="mostrarFormulario"
       class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      @click.self="cancelarFormulario"
+      @keydown.esc="cancelarFormulario"
     >
-      <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-        <h2 class="text-xl font-bold text-gray-900 mb-4">
+      <div v-focus-trap class="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="client-form-title" tabindex="-1">
+        <h2 id="client-form-title" class="text-xl font-bold text-gray-900 mb-4">
           {{ clienteEditando ? 'Editar Cliente' : 'Nuevo Cliente' }}
         </h2>
 
         <form @submit.prevent="guardarCliente" class="space-y-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label for="client-name" class="block text-sm font-medium text-gray-700 mb-1">
               Nombre *
             </label>
             <input
               v-model="formulario.nombre"
+              id="client-name"
+              autofocus
               type="text"
               required
               :class="[
@@ -164,18 +173,21 @@
                 getError('nombre') ? 'border-red-300 focus:ring-red-500' : ''
               ]"
               placeholder="Nombre completo"
+              :aria-invalid="Boolean(getError('nombre'))"
+              :aria-describedby="getError('nombre') ? 'client-name-error' : undefined"
             />
-            <div v-if="getError('nombre')" class="mt-1 text-sm text-red-600">
+            <div v-if="getError('nombre')" id="client-name-error" class="mt-1 text-sm text-red-600">
               {{ getError('nombre') }}
             </div>
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label for="client-email" class="block text-sm font-medium text-gray-700 mb-1">
               Email *
             </label>
             <input
               v-model="formulario.email"
+              id="client-email"
               type="email"
               required
               :class="[
@@ -183,18 +195,21 @@
                 getError('email') ? 'border-red-300 focus:ring-red-500' : ''
               ]"
               placeholder="ejemplo@correo.com"
+              :aria-invalid="Boolean(getError('email'))"
+              :aria-describedby="getError('email') ? 'client-email-error' : undefined"
             />
-            <div v-if="getError('email')" class="mt-1 text-sm text-red-600">
+            <div v-if="getError('email')" id="client-email-error" class="mt-1 text-sm text-red-600">
               {{ getError('email') }}
             </div>
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label for="client-phone" class="block text-sm font-medium text-gray-700 mb-1">
               Teléfono *
             </label>
             <input
               v-model="formulario.telefono"
+              id="client-phone"
               type="tel"
               required
               :class="[
@@ -202,18 +217,21 @@
                 getError('telefono') ? 'border-red-300 focus:ring-red-500' : ''
               ]"
               placeholder="123-456-7890"
+              :aria-invalid="Boolean(getError('telefono'))"
+              :aria-describedby="getError('telefono') ? 'client-phone-error' : undefined"
             />
-            <div v-if="getError('telefono')" class="mt-1 text-sm text-red-600">
+            <div v-if="getError('telefono')" id="client-phone-error" class="mt-1 text-sm text-red-600">
               {{ getError('telefono') }}
             </div>
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label for="client-address" class="block text-sm font-medium text-gray-700 mb-1">
               Dirección
             </label>
             <textarea
               v-model="formulario.direccion"
+              id="client-address"
               class="input-field"
               rows="2"
               placeholder="Dirección completa"
@@ -221,11 +239,12 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label for="client-notes" class="block text-sm font-medium text-gray-700 mb-1">
               Notas
             </label>
             <textarea
               v-model="formulario.notas"
+              id="client-notes"
               class="input-field"
               rows="3"
               placeholder="Notas adicionales sobre el cliente"
@@ -283,6 +302,7 @@ import { useFormValidation } from '../composables/useFormValidation'
 import { usePagination } from '../composables/usePagination'
 import { useDebounce, useMemoize } from '../composables/useOptimization'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
+import { useNotifications } from '../composables/useNotifications'
 import PaginationControls from '../components/PaginationControls.vue'
 
 const {
@@ -309,6 +329,7 @@ const {
 const mostrarFormulario = ref(false)
 const clienteEditando = ref(null)
 const mostrarConfirmacion = ref(false)
+const { warning } = useNotifications()
 const clienteAEliminar = ref(null)
 
 // Paginación
@@ -390,12 +411,10 @@ const guardarCliente = () => {
 
   if (!esValido) return
 
-  if (clienteEditando.value) {
-    actualizarCliente(clienteEditando.value.id, formulario.value)
-  } else {
-    agregarCliente(formulario.value)
-  }
-  cancelarFormulario()
+  const resultado = clienteEditando.value
+    ? actualizarCliente(clienteEditando.value.id, formulario.value)
+    : agregarCliente(formulario.value)
+  if (resultado) cancelarFormulario()
 }
 
 const cancelarFormulario = () => {
@@ -409,7 +428,7 @@ const eliminarClienteConfirm = (clienteId) => {
   const vehiculosCliente = obtenerVehiculosPorCliente(clienteId)
   
   if (vehiculosCliente.length > 0) {
-    alert('No se puede eliminar el cliente porque tiene vehículos asociados.')
+    warning('No se puede eliminar el cliente porque tiene vehículos asociados.')
     return
   }
   

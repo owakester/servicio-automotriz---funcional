@@ -1,19 +1,24 @@
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div class="flex justify-between items-center">
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
       <h1 class="text-3xl font-bold text-gray-900">Servicios</h1>
       <button
+        v-if="vehiculos.length > 0"
         @click="mostrarFormulario = true"
         class="btn-primary flex items-center"
       >
         <Plus class="h-4 w-4 mr-2" />
         Nuevo Servicio
       </button>
+      <router-link v-else to="/vehiculos" class="btn-primary inline-flex items-center">
+        <Car class="h-4 w-4 mr-2" aria-hidden="true" />
+        Agregar vehículo primero
+      </router-link>
     </div>
 
     <!-- Filtros con mejoras de búsqueda -->
-    <div class="card">
+    <div v-if="servicios.length > 0" class="card">
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div class="relative">
           <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -64,16 +69,6 @@
             Limpiar filtros
           </button>
         </div>
-        <div class="flex items-center gap-4">
-          <label class="flex items-center gap-2">
-            <input
-              v-model="useVirtualScroll"
-              type="checkbox"
-              class="rounded text-primary-600"
-            >
-            <span>Scroll virtual (para listas grandes)</span>
-          </label>
-        </div>
       </div>
     </div>
 
@@ -81,7 +76,7 @@
     <div class="card">
       <!-- Lista Virtual para grandes cantidades de datos -->
       <VirtualList
-        v-if="useVirtualScroll && serviciosFiltrados.length > 50"
+        v-if="serviciosFiltrados.length > 50"
         :items="serviciosFiltrados"
         :item-height="80"
         container-height="600px"
@@ -165,15 +160,17 @@
                   @click="editarServicio(servicio)"
                   class="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
                   title="Editar servicio"
+                  :aria-label="`Editar servicio ${servicio.tipoServicio} de ${servicio.vehiculo?.patente || 'vehículo'}`"
                 >
-                  <Edit2 class="h-4 w-4" />
+                  <Edit2 class="h-4 w-4" aria-hidden="true" />
                 </button>
                 <button
                   @click="eliminarServicioConfirm(servicio.id)"
                   class="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
                   title="Eliminar servicio"
+                  :aria-label="`Eliminar servicio ${servicio.tipoServicio} de ${servicio.vehiculo?.patente || 'vehículo'}`"
                 >
-                  <Trash2 class="h-4 w-4" />
+                  <Trash2 class="h-4 w-4" aria-hidden="true" />
                 </button>
               </div>
             </div>
@@ -278,16 +275,18 @@
                   <button
                     @click="editarServicio(servicio)"
                     class="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
-                    title="Editar servicio"
+                  title="Editar servicio"
+                  :aria-label="`Editar servicio ${servicio.tipoServicio} de ${servicio.vehiculo?.patente || 'vehículo'}`"
                   >
-                    <Edit2 class="h-4 w-4" />
+                    <Edit2 class="h-4 w-4" aria-hidden="true" />
                   </button>
                   <button
                     @click="eliminarServicioConfirm(servicio.id)"
                     class="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
-                    title="Eliminar servicio"
+                  title="Eliminar servicio"
+                  :aria-label="`Eliminar servicio ${servicio.tipoServicio} de ${servicio.vehiculo?.patente || 'vehículo'}`"
                   >
-                    <Trash2 class="h-4 w-4" />
+                    <Trash2 class="h-4 w-4" aria-hidden="true" />
                   </button>
                 </div>
               </td>
@@ -296,7 +295,7 @@
         </table>
         
         <!-- Paginación para tabla tradicional -->
-        <div v-if="!useVirtualScroll && totalPages > 1" class="mt-4">
+        <div v-if="totalPages > 1" class="mt-4">
           <PaginationControls
             :current-page="currentPage"
             :total-pages="totalPages"
@@ -316,17 +315,17 @@
         <div v-if="serviciosFiltrados.length === 0" class="text-center py-12">
           <Wrench class="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 class="text-lg font-medium text-gray-900 mb-2">
-            {{ hayFiltros ? 'No se encontraron servicios' : 'No hay servicios registrados' }}
+            {{ hayFiltros ? 'No se encontraron servicios' : vehiculos.length === 0 ? 'Primero registrá un vehículo' : 'No hay servicios registrados' }}
           </h3>
           <p class="text-gray-500 mb-6">
-            {{ hayFiltros ? 'Intenta con otros filtros' : 'Comienza agregando tu primer servicio' }}
+            {{ hayFiltros ? 'Intenta con otros filtros' : vehiculos.length === 0 ? 'El servicio necesita un vehículo y un cliente asociados.' : 'Registrá el trabajo realizado para conservar el historial.' }}
           </p>
           <button
             v-if="!hayFiltros"
-            @click="mostrarFormulario = true"
+            @click="vehiculos.length === 0 ? router.push('/vehiculos') : (mostrarFormulario = true)"
             class="btn-primary"
           >
-            Agregar Servicio
+            {{ vehiculos.length === 0 ? 'Ir a Vehículos' : 'Agregar Servicio' }}
           </button>
         </div>
       </div>
@@ -336,20 +335,24 @@
     <div
       v-if="mostrarFormulario"
       class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      @click.self="cancelarFormulario"
+      @keydown.esc="cancelarFormulario"
     >
-      <div class="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-        <h2 class="text-xl font-bold text-gray-900 mb-4">
+      <div v-focus-trap class="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="service-form-title" tabindex="-1">
+        <h2 id="service-form-title" class="text-xl font-bold text-gray-900 mb-4">
           {{ servicioEditando ? 'Editar Servicio' : 'Nuevo Servicio' }}
         </h2>
 
         <form @submit.prevent="guardarServicio" class="space-y-4">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
+              <label for="service-vehicle" class="block text-sm font-medium text-gray-700 mb-1">
                 Vehículo *
               </label>
               <select
                 v-model="formulario.vehiculoId"
+                id="service-vehicle"
+                autofocus
                 @change="onVehiculoChange"
                 required
                 class="input-field"
@@ -362,11 +365,12 @@
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
+              <label for="service-client" class="block text-sm font-medium text-gray-700 mb-1">
                 Cliente
               </label>
               <input
                 :value="clienteSeleccionado?.nombre || ''"
+                id="service-client"
                 type="text"
                 readonly
                 class="input-field bg-gray-50"
@@ -377,11 +381,12 @@
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
+              <label for="service-type" class="block text-sm font-medium text-gray-700 mb-1">
                 Tipo de Servicio *
               </label>
               <select
                 v-model="formulario.tipoServicio"
+                id="service-type"
                 required
                 class="input-field"
                 @change="onTipoServicioChange"
@@ -401,11 +406,12 @@
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
+              <label for="service-date" class="block text-sm font-medium text-gray-700 mb-1">
                 Fecha del Servicio *
               </label>
               <input
                 v-model="formulario.fechaServicio"
+                id="service-date"
                 type="date"
                 required
                 class="input-field"
@@ -416,11 +422,12 @@
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
+              <label for="service-status" class="block text-sm font-medium text-gray-700 mb-1">
                 Estado *
               </label>
               <select
                 v-model="formulario.estado"
+                id="service-status"
                 required
                 class="input-field"
               >
@@ -432,11 +439,12 @@
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
+              <label for="service-cost" class="block text-sm font-medium text-gray-700 mb-1">
                 Costo Final ($) *
               </label>
               <input
                 v-model="formulario.costo"
+                id="service-cost"
                 type="number"
                 min="0"
                 step="0.01"
@@ -449,11 +457,12 @@
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
+              <label for="service-mileage" class="block text-sm font-medium text-gray-700 mb-1">
                 Kilometraje actual
               </label>
               <input
                 v-model="formulario.kilometrajeActual"
+                id="service-mileage"
                 type="number"
                 min="0"
                 class="input-field"
@@ -462,7 +471,7 @@
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
+              <label for="service-next-date" class="block text-sm font-medium text-gray-700 mb-1">
                 Próximo servicio (fecha)
                 <span v-if="formulario.tipoServicio === 'Mantenimiento general'" class="text-xs text-blue-600">
                   ✨ Se calcula automáticamente (+1 año)
@@ -470,6 +479,7 @@
               </label>
               <input
                 v-model="formulario.proximoServicio"
+                id="service-next-date"
                 type="date"
                 class="input-field"
                 :class="{
@@ -480,11 +490,12 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label for="service-description" class="block text-sm font-medium text-gray-700 mb-1">
               Descripción del servicio
             </label>
             <textarea
               v-model="formulario.descripcion"
+              id="service-description"
               class="input-field"
               rows="3"
               placeholder="Describe el trabajo realizado..."
@@ -492,11 +503,12 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label for="service-observations" class="block text-sm font-medium text-gray-700 mb-1">
               Observaciones
             </label>
             <textarea
               v-model="formulario.observaciones"
+              id="service-observations"
               class="input-field"
               rows="3"
               placeholder="Observaciones adicionales..."
@@ -521,12 +533,23 @@
         </form>
       </div>
     </div>
+
+    <ConfirmDialog
+      :show="mostrarConfirmacion"
+      title="Eliminar Servicio"
+      message="¿Estás seguro de que deseas eliminar este servicio?"
+      confirm-text="Eliminar"
+      cancel-text="Cancelar"
+      type="danger"
+      @confirm="confirmarEliminarServicio"
+      @cancel="cancelarEliminarServicio"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { 
   Plus, 
   Car, 
@@ -536,6 +559,7 @@ import {
   Search
 } from 'lucide-vue-next'
 import { useAutoService } from '../composables/useAutoService'
+import ConfirmDialog from '../components/ConfirmDialog.vue'
 import { usePagination } from '../composables/usePagination'
 import { useDebounce, useMemoize } from '../composables/useOptimization'
 import { useMemoryLeakPrevention } from '../composables/useMemoryLeakPrevention'
@@ -543,6 +567,7 @@ import VirtualList from '../components/VirtualList.vue'
 import PaginationControls from '../components/PaginationControls.vue'
 
 const route = useRoute()
+const router = useRouter()
 
 const {
   clientes,
@@ -565,7 +590,8 @@ const servicioEditando = ref(null)
 const filtroVehiculo = ref('')
 const filtroCliente = ref('')
 const filtroEstado = ref('')
-const useVirtualScroll = ref(false)
+const mostrarConfirmacion = ref(false)
+const servicioAEliminar = ref(null)
 
 // 🔧 BÚSQUEDA CORREGIDA - Directo sin debounce
 const filtroTexto = ref('')
@@ -822,12 +848,10 @@ const guardarServicio = () => {
     proximoServicio: formulario.value.proximoServicio || null
   }
 
-  if (servicioEditando.value) {
-    actualizarServicio(servicioEditando.value.id, datosServicio)
-  } else {
-    agregarServicio(datosServicio)
-  }
-  cancelarFormulario()
+  const resultado = servicioEditando.value
+    ? actualizarServicio(servicioEditando.value.id, datosServicio)
+    : agregarServicio(datosServicio)
+  if (resultado) cancelarFormulario()
 }
 
 const cancelarFormulario = () => {
@@ -837,9 +861,18 @@ const cancelarFormulario = () => {
 }
 
 const eliminarServicioConfirm = (servicioId) => {
-  if (confirm('¿Estás seguro de que deseas eliminar este servicio?')) {
-    eliminarServicio(servicioId)
-  }
+  servicioAEliminar.value = servicioId
+  mostrarConfirmacion.value = true
+}
+
+const confirmarEliminarServicio = () => {
+  if (servicioAEliminar.value !== null) eliminarServicio(servicioAEliminar.value)
+  cancelarEliminarServicio()
+}
+
+const cancelarEliminarServicio = () => {
+  mostrarConfirmacion.value = false
+  servicioAEliminar.value = null
 }
 
 // Inicialización
@@ -849,17 +882,12 @@ onMounted(() => {
     filtroVehiculo.value = route.query.vehiculo
   }
   
-  if (route.query.nuevo === 'true') {
+  if (route.query.nuevo === 'true' && vehiculos.value.length > 0) {
     if (route.query.vehiculo) {
       formulario.value.vehiculoId = route.query.vehiculo
       onVehiculoChange()
     }
     mostrarFormulario.value = true
-  }
-  
-  // Activar virtual scroll automáticamente si hay muchos registros
-  if (servicios.value.length > 100) {
-    useVirtualScroll.value = true
   }
   
   // Detectar memory leaks en desarrollo

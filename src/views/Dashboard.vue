@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div class="flex justify-between items-center">
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
       <h1 class="text-3xl font-bold text-gray-900">Dashboard</h1>
       <div class="text-sm text-gray-500">
         {{ new Date().toLocaleDateString('es-ES', { 
@@ -13,8 +13,34 @@
       </div>
     </div>
 
+    <section v-if="sinDatos" class="card border border-primary-100" aria-labelledby="primeros-pasos-title">
+      <div class="max-w-3xl">
+        <p class="text-sm font-semibold text-primary-700 mb-1">Primeros pasos</p>
+        <h2 id="primeros-pasos-title" class="text-2xl font-bold text-gray-900 mb-2">Prepará el taller en pocos minutos</h2>
+        <p class="text-gray-600 mb-6">Empezá por el cliente, asociá su vehículo y luego creá una orden de trabajo.</p>
+        <ol class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <li class="rounded-lg border border-gray-200 p-4">
+            <span class="text-xs font-semibold text-primary-700">PASO 1</span>
+            <h3 class="font-semibold text-gray-900 mt-1">Registrar cliente</h3>
+            <p class="text-sm text-gray-600 mt-1 mb-4">Guardá sus datos de contacto.</p>
+            <router-link to="/clientes" class="btn-primary inline-flex">Ir a Clientes</router-link>
+          </li>
+          <li class="rounded-lg border border-gray-200 p-4">
+            <span class="text-xs font-semibold text-gray-500">PASO 2</span>
+            <h3 class="font-semibold text-gray-900 mt-1">Agregar vehículo</h3>
+            <p class="text-sm text-gray-600 mt-1">Asocialo al cliente para conservar su historial.</p>
+          </li>
+          <li class="rounded-lg border border-gray-200 p-4">
+            <span class="text-xs font-semibold text-gray-500">PASO 3</span>
+            <h3 class="font-semibold text-gray-900 mt-1">Crear orden</h3>
+            <p class="text-sm text-gray-600 mt-1">Registrá el trabajo, prioridad y presupuesto.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
     <!-- Estadísticas -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
       <div class="card">
         <div class="flex items-center">
           <div class="p-3 bg-blue-100 rounded-lg">
@@ -79,7 +105,7 @@
     </div>
 
     <!-- Alertas -->
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+    <div v-if="!sinDatos" class="grid grid-cols-1 lg:grid-cols-4 gap-6">
       <!-- Servicios Vencidos -->
       <div class="card">
         <h3 class="text-lg font-semibold text-red-600 mb-4 flex items-center">
@@ -198,7 +224,7 @@
     </div>
 
     <!-- Servicios Recientes -->
-    <div class="card">
+    <div v-if="!sinDatos" class="card">
       <h3 class="text-lg font-semibold text-gray-900 mb-4">Servicios Recientes</h3>
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
@@ -299,6 +325,13 @@ const {
   obtenerClientePorId 
 } = useAutoService()
 
+const sinDatos = computed(() =>
+  estadisticas.value.totalClientes === 0 &&
+  estadisticas.value.totalVehiculos === 0 &&
+  estadisticas.value.totalServicios === 0 &&
+  estadisticas.value.totalOrdenes === 0
+)
+
 const { ordenesVencidas } = useOrdenes()
 const { measureComponentRender, detectExcessiveRerenders } = usePerformanceMonitor()
 const { getOrFetch } = useSmartCache()
@@ -376,7 +409,7 @@ const vehiculosProximos = useMemoize(
 const serviciosRecientes = useMemoize(() => {
   checkRerenders() // Verificar re-renders
   
-  return servicios.value
+  return [...servicios.value]
     .sort((a, b) => new Date(b.fechaServicio) - new Date(a.fechaServicio))
     .slice(0, 5)
     .map(servicio => ({
