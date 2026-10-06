@@ -238,7 +238,9 @@ export const useGoogleDrive = () => {
       }
       if (!tokenClient.value) throw new Error('TokenClient no disponible')
 
-      return await solicitarToken('consent', true)
+      // Reutilizar el permiso concedido; Google pedirá consentimiento cuando
+      // realmente sea necesario (primer acceso o autorización revocada).
+      return await solicitarToken('', true)
     } catch (err) {
       error(`Error al autenticar: ${err.message}`)
       return false
@@ -517,9 +519,8 @@ export const useGoogleDrive = () => {
 
   const cerrarSesion = () => {
     try {
-      if (accessToken.value) {
-        window.google?.accounts?.oauth2?.revoke?.(accessToken.value, () => {})
-      }
+      // Desconectar la sesión local no debe revocar los permisos concedidos.
+      // El usuario puede retirarlos desde la configuración de su cuenta Google.
       limpiarSesion()
       refreshToken.value = null
       eliminarLocalSeguro('google_refresh_token')

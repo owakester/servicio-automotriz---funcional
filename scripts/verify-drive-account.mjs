@@ -29,6 +29,7 @@ let tokenNumber = 0
 let requests = []
 let fileCalls = 0
 let fetchCalls = 0
+let revokeCalls = 0
 globalThis.window = {
   gapi: {
     load: (_, options) => options.callback(),
@@ -56,7 +57,7 @@ globalThis.window = {
       }
       return tokenClient
     },
-    revoke() {}
+    revoke() { revokeCalls++ }
   } } }
 }
 globalThis.fetch = async (url, options) => {
@@ -118,6 +119,24 @@ try {
     assert.equal(await drive.crearCarpeta('Permitida'), 'carpeta-simulada')
     assert.equal(fetchCalls, before)
   })
+  await check('conectar y reconectar no fuerzan consentimiento ni revocan permisos', async () => {
+    assert.equal(requests.at(-1).prompt, '')
+    assert.ok(storage.has('google_token_expiry'))
+    storage.set('google_refresh_token', 'dato-antiguo-simulado')
+    drive.cerrarSesion()
+    disconnected()
+    assert.equal(storage.has('google_token_expiry'), false)
+    assert.equal(storage.has('google_refresh_token'), false)
+    assert.equal(revokeCalls, 0)
+    const before = requests.length
+    nextEmail = expectedEmail
+    assert.equal(await drive.authenticateUser(), true)
+    assert.equal(requests.length, before + 1)
+    assert.equal(requests.at(-1).prompt, '')
+    assert.equal(requests.at(-1).login_hint, expectedEmail)
+    assert.equal(drive.estaAutenticado(), true)
+    assert.equal(revokeCalls, 0)
+  })
   await check('una renovación con otra cuenta no recupera el token anterior', async () => {
     const originalNow = Date.now
     const now = originalNow()
@@ -125,6 +144,7 @@ try {
     nextEmail = 'otra@example.com'
     try {
       assert.equal(await drive.asegurarTokenValido(), false)
+      assert.equal(requests.at(-1).prompt, '')
       disconnected()
     } finally { Date.now = originalNow }
   })
