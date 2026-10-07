@@ -55,6 +55,7 @@
         </div>
         <ol class="list-decimal pl-5 space-y-2 text-gray-700">
           <li>Entrá en <strong>Clientes</strong> y seleccioná <strong>Nuevo Cliente</strong>.</li>
+          <li>Podés completar el <strong>DNI/CUIL</strong> para identificar al cliente y buscarlo por documento. Es opcional: DNI de 7 u 8 dígitos, o CUIL de 11, con o sin puntos y guiones.</li>
           <li>Completá nombre, email y teléfono.</li>
           <li>Presioná <strong>Crear</strong>.</li>
           <li>Usá Editar para corregir información o WhatsApp para comunicarte.</li>
@@ -102,6 +103,7 @@
           <li>Elegí vehículo, tipo de trabajo, fecha, estado y costo final.</li>
           <li>Agregá kilometraje, observaciones y próximo servicio.</li>
           <li>En mantenimiento general, la próxima fecha se propone automáticamente.</li>
+          <li>La <strong>campana</strong> junto al nombre del programa muestra los próximos mantenimientos vencidos, los que vencen hoy y los de los próximos 7 días. Recibirás un resumen diario mientras el programa esté abierto; podés desactivarlo desde esa lista. No se envían correos ni WhatsApp automáticamente.</li>
         </ol>
       </article>
     </section>

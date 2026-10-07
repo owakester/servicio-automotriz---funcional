@@ -6,6 +6,7 @@ import { useReports } from './useReports'
 import { useProximosServicios } from './useProximosServicios'
 import { crearSnapshotRecuperacion, useDataRecovery, validarDatosAutoservice } from './useDataRecovery'
 import { fechaParaInput, formatearFecha } from '../utils/dates'
+import { formatearDniCuil } from '../utils/clientIdentity'
 
 const leerPreferenciaLocal = (clave, valorPorDefecto = null) => {
   try {
@@ -148,7 +149,7 @@ export const useBackupSystem = () => {
 
   const generarCSVClientes = (clientesData) => {
     return crearCSV(
-      ['ID', 'Nombre', 'Email', 'Teléfono', 'Dirección', 'Servicios completados', 'Total de trabajos realizados', 'Último Servicio', 'Fecha Registro'],
+      ['ID', 'Nombre', 'DNI/CUIL', 'Email', 'Teléfono', 'Dirección', 'Servicios completados', 'Total de trabajos realizados', 'Último Servicio', 'Fecha Registro'],
       clientesData.map(cliente => {
         const serviciosCliente = servicios.value.filter(servicio => String(servicio.clienteId) === String(cliente.id) && servicio.estado === 'completado')
         const ultimoServicio = [...serviciosCliente]
@@ -157,6 +158,7 @@ export const useBackupSystem = () => {
         return [
           cliente.id,
           cliente.nombre,
+          formatearDniCuil(cliente.dniCuil),
           cliente.email,
           cliente.telefono,
           cliente.direccion || '',
@@ -171,7 +173,7 @@ export const useBackupSystem = () => {
   
   const generarCSVVehiculos = () => {
     return crearCSV(
-      ['ID', 'Cliente', 'Marca', 'Modelo', 'Año', 'Patente', 'Número Motor', 'Número Chasis', 'Kilometraje', 'Cantidad Servicios', 'Último Servicio'],
+      ['ID', 'Cliente', 'DNI/CUIL', 'Marca', 'Modelo', 'Año', 'Patente', 'Número Motor', 'Número Chasis', 'Kilometraje', 'Cantidad Servicios', 'Último Servicio'],
       vehiculos.value.map(vehiculo => {
         const cliente = clientes.value.find(c => c.id === vehiculo.clienteId)
         const serviciosVehiculo = servicios.value.filter(s => s.vehiculoId === vehiculo.id)
@@ -180,6 +182,7 @@ export const useBackupSystem = () => {
         return [
           vehiculo.id,
           cliente?.nombre || '',
+          formatearDniCuil(cliente?.dniCuil),
           vehiculo.marca,
           vehiculo.modelo,
           vehiculo.anio ?? vehiculo.año ?? '',
@@ -196,11 +199,12 @@ export const useBackupSystem = () => {
   
   const generarCSVServicios = (serviciosData) => {
     return crearCSV(
-      ['ID', 'Fecha', 'Cliente', 'Email', 'Vehículo', 'Patente', 'Tipo Servicio', 'Estado', 'Kilometraje', 'Costo', 'Próximo Servicio', 'Descripción', 'Observaciones'],
+      ['ID', 'Fecha', 'Cliente', 'DNI/CUIL', 'Email', 'Vehículo', 'Patente', 'Tipo Servicio', 'Estado', 'Kilometraje', 'Costo', 'Próximo Servicio', 'Descripción', 'Observaciones'],
       serviciosData.map(servicio => [
         servicio.id,
         formatearFechaCSV(servicio.fechaServicio),
         servicio.cliente?.nombre || '',
+        formatearDniCuil(servicio.cliente?.dniCuil),
         servicio.cliente?.email || '',
         `${servicio.vehiculo?.marca || ''} ${servicio.vehiculo?.modelo || ''}`.trim(),
         servicio.vehiculo?.patente || '',
@@ -217,7 +221,7 @@ export const useBackupSystem = () => {
   
   const generarCSVOrdenes = () => {
     return crearCSV(
-      ['ID', 'Número Orden', 'Cliente', 'Vehículo', 'Estado', 'Prioridad', 'Fecha Creación', 'Fecha Vencimiento', 'Costo Estimado', 'Costo Real', 'Descripción Trabajo', 'Observaciones'],
+      ['ID', 'Número Orden', 'Cliente', 'DNI/CUIL', 'Vehículo', 'Estado', 'Prioridad', 'Fecha Creación', 'Fecha Vencimiento', 'Costo Estimado', 'Costo Real', 'Descripción Trabajo', 'Observaciones'],
       ordenes.value.map(orden => {
         const cliente = clientes.value.find(c => c.id === orden.clienteId)
         const vehiculo = vehiculos.value.find(v => v.id === orden.vehiculoId)
@@ -225,6 +229,7 @@ export const useBackupSystem = () => {
           orden.id,
           orden.numeroOrden,
           cliente?.nombre || '',
+          formatearDniCuil(cliente?.dniCuil),
           vehiculo ? `${vehiculo.marca} ${vehiculo.modelo}` : '',
           orden.estado,
           orden.prioridad,
@@ -404,10 +409,11 @@ export const useBackupSystem = () => {
       switch (tipo) {
         case 'clientes':
           contenido = crearCSV(
-            ['ID', 'Nombre', 'Email', 'Teléfono', 'Dirección', 'Fecha Creación'],
+            ['ID', 'Nombre', 'DNI/CUIL', 'Email', 'Teléfono', 'Dirección', 'Fecha Creación'],
             clientes.value.map(cliente => [
               cliente.id,
               cliente.nombre,
+              formatearDniCuil(cliente.dniCuil),
               cliente.email,
               cliente.telefono,
               cliente.direccion || '',
@@ -419,12 +425,13 @@ export const useBackupSystem = () => {
 
         case 'vehiculos':
           contenido = crearCSV(
-            ['ID', 'Cliente', 'Marca', 'Modelo', 'Año', 'Patente', 'Número Motor', 'Número Chasis', 'Kilometraje'],
+            ['ID', 'Cliente', 'DNI/CUIL', 'Marca', 'Modelo', 'Año', 'Patente', 'Número Motor', 'Número Chasis', 'Kilometraje'],
             vehiculos.value.map(vehiculo => {
               const cliente = clientes.value.find(c => c.id === vehiculo.clienteId)
               return [
                 vehiculo.id,
                 cliente?.nombre || '',
+                formatearDniCuil(cliente?.dniCuil),
                 vehiculo.marca,
                 vehiculo.modelo,
                 vehiculo.anio ?? vehiculo.año ?? '',
@@ -440,7 +447,7 @@ export const useBackupSystem = () => {
 
         case 'servicios':
           contenido = crearCSV(
-            ['ID', 'Fecha', 'Vehículo', 'Patente', 'Cliente', 'Email', 'Tipo Servicio', 'Estado', 'Kilometraje', 'Costo', 'Próximo Servicio', 'Descripción', 'Observaciones'],
+            ['ID', 'Fecha', 'Vehículo', 'Patente', 'Cliente', 'DNI/CUIL', 'Email', 'Tipo Servicio', 'Estado', 'Kilometraje', 'Costo', 'Próximo Servicio', 'Descripción', 'Observaciones'],
             servicios.value.map(servicio => {
               const vehiculo = vehiculos.value.find(v => v.id === servicio.vehiculoId)
               const cliente = clientes.value.find(c => c.id === servicio.clienteId)
@@ -450,6 +457,7 @@ export const useBackupSystem = () => {
                 `${vehiculo?.marca || ''} ${vehiculo?.modelo || ''}`.trim(),
                 vehiculo?.patente || '',
                 cliente?.nombre || '',
+                formatearDniCuil(cliente?.dniCuil),
                 cliente?.email || '',
                 servicio.tipoServicio,
                 servicio.estado,
@@ -466,7 +474,7 @@ export const useBackupSystem = () => {
 
         case 'ordenes':
           contenido = crearCSV(
-            ['ID', 'Número Orden', 'Cliente', 'Vehículo', 'Estado', 'Prioridad', 'Fecha Creación', 'Fecha Vencimiento', 'Costo Estimado', 'Costo Real', 'Descripción', 'Observaciones'],
+            ['ID', 'Número Orden', 'Cliente', 'DNI/CUIL', 'Vehículo', 'Estado', 'Prioridad', 'Fecha Creación', 'Fecha Vencimiento', 'Costo Estimado', 'Costo Real', 'Descripción', 'Observaciones'],
             ordenes.value.map(orden => {
               const vehiculo = vehiculos.value.find(v => v.id === orden.vehiculoId)
               const cliente = clientes.value.find(c => c.id === orden.clienteId)
@@ -474,6 +482,7 @@ export const useBackupSystem = () => {
                 orden.id,
                 orden.numeroOrden,
                 cliente?.nombre || '',
+                formatearDniCuil(cliente?.dniCuil),
                 `${vehiculo?.marca || ''} ${vehiculo?.modelo || ''}`.trim(),
                 orden.estado,
                 orden.prioridad,

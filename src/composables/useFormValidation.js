@@ -1,4 +1,5 @@
 import { ref, computed } from 'vue'
+import { esDniCuilValido } from '../utils/clientIdentity'
 
 export const useFormValidation = () => {
   const errors = ref({})
@@ -26,6 +27,15 @@ export const useFormValidation = () => {
     const phoneRegex = /^[\d\s\-\+\(\)]+$/
     if (phone && !phoneRegex.test(phone)) {
       errors.value[fieldName] = 'Formato de teléfono inválido'
+      return false
+    }
+    delete errors.value[fieldName]
+    return true
+  }
+
+  const validateDniCuil = (value, fieldName = 'dniCuil') => {
+    if (!esDniCuilValido(value)) {
+      errors.value[fieldName] = 'Ingresá un DNI de 7 u 8 dígitos o un CUIL de 11 dígitos'
       return false
     }
     delete errors.value[fieldName]
@@ -102,6 +112,7 @@ export const useFormValidation = () => {
     validateRequired,
     validateEmail,
     validatePhone,
+    validateDniCuil,
     validatePatente,
     validateYear,
     validatePositiveNumber,

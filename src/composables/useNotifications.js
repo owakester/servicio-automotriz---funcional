@@ -1,4 +1,5 @@
 import { ref, computed } from 'vue'
+import { crearIdUnico } from '../utils/dataIntegrity'
 
 const leerLocalSeguro = (clave) => {
   try { return localStorage.getItem(clave) }
@@ -27,7 +28,7 @@ const notificationHistory = ref(cargarHistorial())
 export const useNotifications = () => {
   const addNotification = (notification) => {
     const newNotification = {
-      id: Date.now(),
+      id: crearIdUnico(),
       timestamp: new Date().toISOString(),
       ...notification
     }

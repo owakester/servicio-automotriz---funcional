@@ -7,6 +7,7 @@
           <div class="flex items-center flex-shrink-0">
             <Car class="h-8 w-8 text-primary-600 mr-2" aria-hidden="true" />
             <span class="text-xl font-bold text-gray-900">ServiceCar</span>
+            <RecordatoriosServicios />
           </div>
           
           <div class="flex gap-1 sm:gap-2 overflow-x-auto pb-1 sm:pb-0" aria-label="Secciones del sistema">
@@ -49,6 +50,7 @@ import { onMounted, onUnmounted, inject } from 'vue'
 import { Car, BarChart3, Users, Wrench, FileText, Settings, ClipboardList, HelpCircle } from 'lucide-vue-next'
 import NotificationContainer from './components/NotificationContainer.vue'
 import WhatsAppFloatingButton from './components/WhatsAppFloatingButton.vue'
+import RecordatoriosServicios from './components/RecordatoriosServicios.vue'
 import { useAutoService } from './composables/useAutoService'
 import { iniciarRelojCalendario, detenerRelojCalendario } from './composables/useFechaActual'
 

@@ -21,7 +21,10 @@ const compilado = await build({
     contents: [
       "export { useAutoService } from './src/composables/useAutoService.js'",
       "export { useOrdenes } from './src/composables/useOrdenes.js'",
-      "export { validarDatosAutoservice } from './src/composables/useDataRecovery.js'"
+      "export { validarDatosAutoservice } from './src/composables/useDataRecovery.js'",
+      "export { useFormValidation } from './src/composables/useFormValidation.js'",
+      "export { usePagination } from './src/composables/usePagination.js'",
+      "export * from './src/utils/clientIdentity.js'"
     ].join('\n'),
     resolveDir: process.cwd(),
     sourcefile: 'crud-integrity-test-entry.js'
@@ -36,7 +39,7 @@ const compilado = await build({
 })
 
 const codigo = Buffer.from(compilado.outputFiles[0].contents).toString('base64')
-const { useAutoService, useOrdenes, validarDatosAutoservice } = await import(
+const { useAutoService, useOrdenes, validarDatosAutoservice, useFormValidation, usePagination, esDniCuilValido, formatearDniCuil, etiquetaCliente } = await import(
   `data:text/javascript;base64,${codigo}`
 )
 
@@ -111,6 +114,56 @@ await probar('CRUD completo y persistencia de las cuatro colecciones', async () 
     [datos.clientes.value, datos.vehiculos.value, datos.servicios.value, datos.ordenes.value].map((lista) => lista.length),
     [0, 0, 0, 0]
   )
+})
+
+await probar('DNI/CUIL opcional conserva ceros, acepta separadores y permite editar o borrar', async () => {
+  const antiguo = datos.agregarCliente({ nombre: 'Sin documento' })
+  assert.equal(antiguo.dniCuil, '')
+  const cliente = datos.agregarCliente({ nombre: 'Documento QA', dniCuil: '01.234.567' })
+  assert.equal(cliente.dniCuil, '01234567')
+  const actualizado = datos.actualizarCliente(cliente.id, { dniCuil: '20-12345678-6' })
+  assert.equal(actualizado.dniCuil, '20123456786')
+  assert.equal(formatearDniCuil(actualizado.dniCuil), '20-12345678-6')
+  assert.match(etiquetaCliente(actualizado), /Documento QA.*20-12345678-6/)
+  await esperarPersistencia()
+  const guardados = JSON.parse(localStorage.getItem('autoservice_clientes'))
+  assert.equal(guardados[1].dniCuil, '20123456786')
+  assert.equal(validarDatosAutoservice({ clientes: [{ id: 1, nombre: 'Cliente anterior' }], vehiculos: [], servicios: [], ordenes: [] }), true)
+  assert.equal(datos.actualizarCliente(cliente.id, { nombre: 'Otro nombre' }).dniCuil, '20123456786')
+  assert.equal(datos.actualizarCliente(cliente.id, { dniCuil: '' }).dniCuil, '')
+})
+
+await probar('DNI/CUIL inválido no modifica clientes y muestra error junto al campo', async () => {
+  const validacion = useFormValidation()
+  for (const valor of ['', '1234567', '12345678', '20-12345678-6']) {
+    assert.equal(esDniCuilValido(valor), true)
+    assert.equal(validacion.validateDniCuil(valor), true)
+  }
+  const cliente = datos.agregarCliente({ nombre: 'Con documento', dniCuil: '12345678' })
+  for (const valor of ['123', '123456789', '123456789012', 'AB12345678', '<script>']) {
+    assert.equal(validacion.validateDniCuil(valor), false)
+    assert.match(validacion.getError('dniCuil'), /DNI.*CUIL/)
+    assert.equal(datos.agregarCliente({ nombre: 'Rechazado', dniCuil: valor }), null)
+    assert.equal(datos.actualizarCliente(cliente.id, { dniCuil: valor }), null)
+    assert.equal(datos.obtenerClientePorId(cliente.id).dniCuil, '12345678')
+  }
+  assert.equal(datos.clientes.value.length, 1)
+  assert.equal(validacion.validateDniCuil(''), true)
+  assert.equal(validacion.getError('dniCuil'), '')
+})
+
+await probar('buscar clientes por DNI/CUIL funciona con y sin separadores', async () => {
+  datos.agregarCliente({ nombre: 'DNI QA', dniCuil: '12345678' })
+  datos.agregarCliente({ nombre: 'CUIL QA', dniCuil: '27111222334' })
+  const paginacion = usePagination(datos.clientes)
+  for (const consulta of ['12345678', '12.345.678']) {
+    paginacion.searchQuery.value = consulta
+    assert.equal(paginacion.paginatedItems.value[0].nombre, 'DNI QA')
+  }
+  for (const consulta of ['27111222334', '27-11122233-4']) {
+    paginacion.searchQuery.value = consulta
+    assert.equal(paginacion.paginatedItems.value[0].nombre, 'CUIL QA')
+  }
 })
 
 await probar('los IDs permanecen únicos aunque dos altas ocurran en el mismo milisegundo', async () => {

@@ -129,6 +129,7 @@
             <tr>
               <th>Cliente</th>
               <th>Email</th>
+              <th>DNI/CUIL</th>
               <th>Servicios completados</th>
               <th>Total de trabajos realizados</th>
               <th>Último Servicio</th>
@@ -138,6 +139,7 @@
             <tr v-for="cliente in clientesFrecuentes" :key="cliente.id">
               <td class="font-medium">{{ cliente.nombre }}</td>
               <td>{{ cliente.email }}</td>
+              <td>{{ formatearDniCuil(cliente.dniCuil) || 'Sin registrar' }}</td>
               <td>{{ cliente.cantidadServicios }}</td>
               <td>${{ cliente.totalGastado.toLocaleString() }}</td>
               <td>
@@ -231,6 +233,7 @@ import BaseCard from '../components/BaseCard.vue'
 import { useReports } from '../composables/useReports'
 import { useAutoService } from '../composables/useAutoService'
 import { fechaParaInput, formatearFecha } from '../utils/dates'
+import { formatearDniCuil } from '../utils/clientIdentity'
 
 const {
   getIngresosPorPeriodo,

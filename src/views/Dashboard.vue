@@ -122,7 +122,7 @@
               <div>
                 <p class="font-medium text-red-900">{{ vehiculo.marca }} {{ vehiculo.modelo }}</p>
                 <p class="text-sm text-red-600">Patente: {{ vehiculo.patente }}</p>
-                <p class="text-sm text-red-600">Cliente: {{ vehiculo.cliente?.nombre }}</p>
+                <p class="text-sm text-red-600"><ClienteIdentificacion :cliente="vehiculo.cliente" /></p>
               </div>
               <span class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
                 {{ vehiculo.alerta.dias }} días vencido
@@ -151,7 +151,7 @@
               <div>
                 <p class="font-medium text-orange-900">{{ vehiculo.marca }} {{ vehiculo.modelo }}</p>
                 <p class="text-sm text-orange-600">Patente: {{ vehiculo.patente }}</p>
-                <p class="text-sm text-orange-600">Cliente: {{ vehiculo.cliente?.nombre }}</p>
+                <p class="text-sm text-orange-600"><ClienteIdentificacion :cliente="vehiculo.cliente" /></p>
               </div>
               <span class="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">
                 {{ vehiculo.alerta.dias }} días
@@ -180,7 +180,7 @@
               <div>
                 <p class="font-medium text-red-900">{{ orden.numeroOrden }}</p>
                 <p class="text-sm text-red-600">{{ orden.vehiculo?.marca }} {{ orden.vehiculo?.modelo }}</p>
-                <p class="text-sm text-red-600">{{ orden.cliente?.nombre }}</p>
+                <p class="text-sm text-red-600"><ClienteIdentificacion :cliente="orden.cliente" /></p>
               </div>
               <span class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
                 Vencida
@@ -209,7 +209,7 @@
               <div>
                 <p class="font-medium text-yellow-900">{{ vehiculo.marca }} {{ vehiculo.modelo }}</p>
                 <p class="text-sm text-yellow-600">Patente: {{ vehiculo.patente }}</p>
-                <p class="text-sm text-yellow-600">Cliente: {{ vehiculo.cliente?.nombre }}</p>
+                <p class="text-sm text-yellow-600"><ClienteIdentificacion :cliente="vehiculo.cliente" /></p>
               </div>
               <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
                 {{ vehiculo.alerta.dias }} días
@@ -262,7 +262,7 @@
                 <div class="text-sm text-gray-500">{{ servicio.vehiculo?.patente }}</div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                {{ servicio.cliente?.nombre }}
+                <ClienteIdentificacion :cliente="servicio.cliente" />
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                 {{ servicio.tipoServicio }}
@@ -318,6 +318,7 @@ import { usePerformanceMonitor } from '../composables/usePerformanceMonitor'
 import { useSmartCache } from '../composables/useSmartCache'
 import { diasHastaFecha, formatearFecha, parsearFechaLocal } from '../utils/dates'
 import { useFechaActual } from '../composables/useFechaActual'
+import ClienteIdentificacion from '../components/ClienteIdentificacion.vue'
 
 const { fechaActual } = useFechaActual()
 
@@ -325,6 +326,8 @@ const {
   vehiculosConAlertas, 
   estadisticas, 
   servicios, 
+  clientes,
+  vehiculos,
   obtenerVehiculoPorId, 
   obtenerClientePorId 
 } = useAutoService()
@@ -397,5 +400,5 @@ const serviciosRecientes = useMemoize(() => {
       vehiculo: obtenerVehiculoPorId(servicio.vehiculoId),
       cliente: obtenerClientePorId(servicio.clienteId)
     }))
-}, [servicios])
+}, [servicios, clientes, vehiculos])
 </script>

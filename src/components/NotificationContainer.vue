@@ -25,6 +25,11 @@
               <p class="notification-message text-sm font-medium text-gray-900">
                 {{ notification.message }}
               </p>
+              <button v-if="notification.action === 'recordatorios-servicios'" type="button"
+                class="mt-2 text-sm font-semibold text-primary-700 underline focus:outline-none focus:ring-2 focus:ring-primary-500 rounded"
+                @click="abrirRecordatorios(); removeNotification(notification.id)">
+                Ver recordatorios
+              </button>
             </div>
             <div class="ml-4 flex-shrink-0 flex">
               <button
@@ -47,8 +52,10 @@
 <script setup>
 import { CheckCircle, XCircle, AlertCircle, Info, X } from 'lucide-vue-next'
 import { useNotifications } from '../composables/useNotifications'
+import { useRecordatoriosServicios } from '../composables/useRecordatoriosServicios'
 
 const { notifications, removeNotification } = useNotifications()
+const { abrirRecordatorios } = useRecordatoriosServicios()
 
 const getIcon = (type) => {
   const icons = {

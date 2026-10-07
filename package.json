@@ -7,11 +7,12 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "npm run test:backup && npm run test:integrity && npm run test:regressions && npm run test:drive-account",
+    "test": "npm run test:backup && npm run test:integrity && npm run test:regressions && npm run test:drive-account && npm run test:reminders",
     "test:backup": "node scripts/verify-backup.mjs",
     "test:integrity": "node scripts/verify-crud-integrity.mjs",
     "test:regressions": "node scripts/verify-functional-regressions.mjs",
-    "test:drive-account": "node scripts/verify-drive-account.mjs"
+    "test:drive-account": "node scripts/verify-drive-account.mjs",
+    "test:reminders": "node scripts/verify-service-reminders.mjs"
   },
   "dependencies": {
     "lucide-vue-next": "^0.300.0",

@@ -1,5 +1,6 @@
 import { useNotifications } from './useNotifications'
 import { formatearFecha } from '../utils/dates'
+import { formatearDniCuil } from '../utils/clientIdentity'
 
 export const usePDF = () => {
   const { success, error } = useNotifications()
@@ -153,6 +154,10 @@ export const usePDF = () => {
               <div class="info-item">
                 <span class="info-label">Nombre:</span>
                 <span class="info-value">${orden.cliente?.nombre || 'No especificado'}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">DNI/CUIL:</span>
+                <span class="info-value">${formatearDniCuil(orden.cliente?.dniCuil) || 'No especificado'}</span>
               </div>
               <div class="info-item">
                 <span class="info-label">Teléfono:</span>

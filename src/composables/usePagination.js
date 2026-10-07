@@ -1,4 +1,5 @@
 import { ref, computed, watch } from 'vue'
+import { coincideDniCuil } from '../utils/clientIdentity'
 
 export const usePagination = (items, itemsPerPageDefault = 10) => {
   const currentPage = ref(1)
@@ -22,6 +23,7 @@ export const usePagination = (items, itemsPerPageDefault = 10) => {
     
     const query = searchQuery.value.toLowerCase()
     return items.value.filter(item => {
+      if (coincideDniCuil(item.dniCuil, query)) return true
       // Buscar en todos los valores string del objeto
       return Object.values(item).some(value => {
         if (typeof value === 'string') {

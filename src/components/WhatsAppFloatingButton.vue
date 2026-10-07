@@ -95,7 +95,7 @@
             >
               <div class="flex justify-between items-start">
                 <div class="flex-1">
-                  <div class="font-medium text-gray-900">{{ orden.cliente?.nombre }}</div>
+                  <ClienteIdentificacion class="font-medium text-gray-900" :cliente="orden.cliente" />
                   <div class="text-sm text-gray-600">{{ orden.vehiculo?.marca }} {{ orden.vehiculo?.modelo }} - {{ orden.vehiculo?.patente }}</div>
                   <div class="text-xs text-gray-500 mt-1">Orden: {{ orden.numeroOrden }}</div>
                 </div>
@@ -141,7 +141,7 @@
             >
               <div class="flex justify-between items-start">
                 <div class="flex-1">
-                  <div class="font-medium text-gray-900">{{ vehiculo.cliente?.nombre }}</div>
+                  <ClienteIdentificacion class="font-medium text-gray-900" :cliente="vehiculo.cliente" />
                   <div class="text-sm text-gray-600">{{ vehiculo.marca }} {{ vehiculo.modelo }} - {{ vehiculo.patente }}</div>
                   <div 
                     :class="[
@@ -192,7 +192,7 @@
             <input
               v-model="filtroContacto"
               type="text"
-              placeholder="Buscar cliente..."
+              placeholder="Buscar por nombre, teléfono o DNI/CUIL..."
               aria-label="Buscar cliente para contactar"
               class="input-field"
             />
@@ -206,7 +206,7 @@
             >
               <div class="flex justify-between items-center">
                 <div class="flex-1">
-                  <div class="font-medium text-gray-900">{{ cliente.nombre }}</div>
+                  <ClienteIdentificacion class="font-medium text-gray-900" :cliente="cliente" />
                   <div class="text-sm text-gray-600">{{ formatearTelefonoDisplay(cliente.telefono) }}</div>
                 </div>
                 <button
@@ -242,6 +242,8 @@ import {
 } from 'lucide-vue-next'
 import { useAutoService } from '../composables/useAutoService'
 import { useOrdenes } from '../composables/useOrdenes'
+import ClienteIdentificacion from './ClienteIdentificacion.vue'
+import { coincideDniCuil } from '../utils/clientIdentity'
 
 const {
   clientes,
@@ -277,7 +279,8 @@ const clientesFiltrados = computed(() => {
   return clientes.value.filter(cliente => 
     cliente.telefono &&
     (cliente.nombre.toLowerCase().includes(filtro) ||
-     cliente.telefono.includes(filtro))
+     cliente.telefono.includes(filtro) ||
+     coincideDniCuil(cliente.dniCuil, filtro))
   )
 })
 

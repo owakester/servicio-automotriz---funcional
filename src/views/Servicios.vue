@@ -25,7 +25,7 @@
           <input
             v-model="filtroTexto"
             type="text"
-            placeholder="Buscar por tipo de servicio..."
+            placeholder="Buscar por servicio, vehículo, cliente o DNI/CUIL..."
             class="input-field pl-10"
             aria-label="Buscar servicios"
           />
@@ -42,7 +42,7 @@
           <select v-model="filtroCliente" class="input-field">
             <option value="">Todos los clientes</option>
             <option v-for="cliente in clientes" :key="cliente.id" :value="cliente.id">
-              {{ cliente.nombre }}
+              {{ etiquetaCliente(cliente) }}
             </option>
           </select>
         </div>
@@ -101,7 +101,7 @@
               
               <!-- Cliente -->
               <div>
-                <div class="text-sm text-gray-900">{{ servicio.cliente?.nombre }}</div>
+                <ClienteIdentificacion class="text-sm text-gray-900" :cliente="servicio.cliente" />
                 <div class="text-sm text-gray-500">{{ formatearTelefonoDisplay(servicio.cliente?.telefono) }}</div>
               </div>
               
@@ -230,7 +230,7 @@
                 </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm text-gray-900">{{ servicio.cliente?.nombre }}</div>
+                <ClienteIdentificacion class="text-sm text-gray-900" :cliente="servicio.cliente" />
                 <div class="text-sm text-gray-500">{{ formatearTelefonoDisplay(servicio.cliente?.telefono) }}</div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
@@ -369,7 +369,7 @@
                 Cliente
               </label>
               <input
-                :value="clienteSeleccionado?.nombre || ''"
+                :value="etiquetaCliente(clienteSeleccionado)"
                 id="service-client"
                 type="text"
                 readonly
@@ -567,6 +567,8 @@ import VirtualList from '../components/VirtualList.vue'
 import PaginationControls from '../components/PaginationControls.vue'
 import { diasHastaFecha, fechaParaInput, formatearFecha, parsearFechaLocal, sumarAnos } from '../utils/dates'
 import { useFechaActual } from '../composables/useFechaActual'
+import ClienteIdentificacion from '../components/ClienteIdentificacion.vue'
+import { etiquetaCliente, coincideDniCuil } from '../utils/clientIdentity'
 
 const { fechaActual } = useFechaActual()
 
@@ -621,7 +623,7 @@ const serviciosConRelaciones = useMemoize(() => {
     vehiculo: obtenerVehiculoPorId(servicio.vehiculoId),
     cliente: obtenerClientePorId(servicio.clienteId)
   }))
-}, [servicios])
+}, [servicios, clientes, vehiculos])
 
 const serviciosFiltrados = computed(() => {
   let resultado = serviciosConRelaciones.value
@@ -636,7 +638,8 @@ const serviciosFiltrados = computed(() => {
       servicio.vehiculo?.marca?.toLowerCase().includes(filtro) ||
       servicio.vehiculo?.modelo?.toLowerCase().includes(filtro) ||
       servicio.vehiculo?.patente?.toLowerCase().includes(filtro) ||
-      servicio.cliente?.nombre?.toLowerCase().includes(filtro)
+      servicio.cliente?.nombre?.toLowerCase().includes(filtro) ||
+      coincideDniCuil(servicio.cliente?.dniCuil, filtro)
     )
   }
 

@@ -23,11 +23,12 @@ class LocalStorageMock {
 const storage = new LocalStorageMock()
 globalThis.localStorage = storage
 let csvBlob
+const downloadedBlobs = []
 globalThis.document = {
   body: { appendChild() {}, removeChild() {} },
   createElement: () => ({ download: '', style: {}, setAttribute() {}, click() {} })
 }
-URL.createObjectURL = (blob) => { csvBlob = blob; return 'blob:test' }
+URL.createObjectURL = (blob) => { csvBlob = blob; downloadedBlobs.push(blob); return 'blob:test' }
 
 const compiled = await build({
   stdin: {
@@ -35,6 +36,9 @@ const compiled = await build({
       "export { useAutoService } from './src/composables/useAutoService.js'",
       "export { useOrdenes } from './src/composables/useOrdenes.js'",
       "export { useReports } from './src/composables/useReports.js'",
+      "export { useBackupSystem } from './src/composables/useBackupSystem.js'",
+      "export { usePDF } from './src/composables/usePDF.js'",
+      "export { useProximosServicios } from './src/composables/useProximosServicios.js'",
       "export { useNotifications } from './src/composables/useNotifications.js'",
       "export { default as OrdenesView } from './src/views/OrdenesMantenimiento.vue'",
       "export { createSSRApp, h } from 'vue'",
@@ -258,6 +262,66 @@ try {
       app.reemplazarDatos({ ...before, servicios: [] })
       assert.equal(financial.getIngresosPorPeriodo('2026-10-01', '2026-10-31').totalIngresos, 0)
     } finally { app.reemplazarDatos(before) }
+  })
+
+  await check('DNI/CUIL aparece en reportes, todos los CSV, comprobantes y copias de recuperación', async () => {
+    const before = JSON.parse(JSON.stringify(current(app)))
+    const originalWindow = globalThis.window
+    try {
+      app.actualizarCliente(client.id, { dniCuil: '20-12345678-6' })
+      const sinServicios = app.agregarCliente({ nombre: 'Cliente sin servicios QA', dniCuil: '87654321' })
+      const ultimoServicio = [...app.servicios.value].sort((a, b) => mod.parsearFechaLocal(b.fechaServicio) - mod.parsearFechaLocal(a.fechaServicio))[0]
+      app.actualizarServicio(ultimoServicio.id, { estado: 'completado', proximoServicio: '2026-10-07' })
+      const identityReports = mod.useReports()
+      assert.equal(identityReports.getClientesFrecuentes()[0].dniCuil, '20123456786')
+      identityReports.exportarClientes()
+      let csv = await csvBlob.text()
+      assert.match(csv.split('\n')[0], /DNI\/CUIL/)
+      assert.match(csv, /20-12345678-6/)
+      assert.match(csv, /Cliente sin servicios QA,87654321/)
+      identityReports.exportarServicios('2026-10-01', '2026-10-31')
+      assert.match(await csvBlob.text(), /20-12345678-6/)
+
+      const backup = mod.useBackupSystem()
+      for (const tipo of ['clientes', 'vehiculos', 'servicios', 'ordenes']) {
+        backup.exportarCSV(tipo)
+        csv = await csvBlob.text()
+        assert.match(csv.split('\n')[0], /DNI\/CUIL/)
+        assert.match(csv, /20-12345678-6/, tipo)
+      }
+      const proximos = mod.useProximosServicios()
+      csv = proximos.convertirACSV(proximos.obtenerDatosProximosServicios())
+      assert.match(csv, /DNI\/CUIL/)
+      assert.match(csv, /20-12345678-6/)
+      const start = downloadedBlobs.length
+      assert.equal(backup.descargarTodosLosReportesCSV(), true)
+      await new Promise(resolve => setTimeout(resolve, 1300))
+      const reportFiles = await Promise.all(downloadedBlobs.slice(start).map(blob => blob.text()))
+      assert.equal(reportFiles.length, 8)
+      for (const index of [0, 1, 2, 3, 7]) {
+        assert.match(reportFiles[index].split('\n')[0], /DNI\/CUIL/)
+        assert.match(reportFiles[index], /20-12345678-6/)
+      }
+      backup.backupGoogleDrive.value = false
+      await backup.crearBackup(false, { notificar: false })
+      const saved = JSON.parse(await csvBlob.text())
+      assert.equal(saved.datos.clientes.find(c => c.id === client.id).dniCuil, '20123456786')
+      assert.equal(saved.datos.clientes.find(c => c.id === sinServicios.id).dniCuil, '87654321')
+      assert.equal((await mod.obtenerUltimoSnapshotValido()).datos.clientes.find(c => c.id === client.id).dniCuil, '20123456786')
+      app.reemplazarDatos(saved.datos)
+      await settle()
+      assert.equal(JSON.parse(storage.getItem('autoservice_clientes')).find(c => c.id === client.id).dniCuil, '20123456786')
+
+      let printedHTML = ''
+      globalThis.window = { open: () => ({ document: { write: html => { printedHTML = html }, close() {} }, focus() {} }) }
+      const printOrder = { ...order, cliente: app.obtenerClientePorId(client.id), vehiculo: car }
+      assert.ok(mod.usePDF().generarPDFOrden(printOrder))
+      assert.match(printedHTML, /DNI\/CUIL:/)
+      assert.match(printedHTML, /20-12345678-6/)
+    } finally {
+      globalThis.window = originalWindow
+      app.reemplazarDatos(before)
+    }
   })
 
   await check('guardar el formulario de una orden conserva fotos nuevas y no resucita fotos eliminadas', async () => {

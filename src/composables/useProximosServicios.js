@@ -2,6 +2,7 @@ import { useAutoService } from './useAutoService'
 import { useGoogleDrive } from './useGoogleDrive'
 import { useNotifications } from './useNotifications'
 import { diasHastaFecha, fechaParaInput, formatearFecha, parsearFechaLocal } from '../utils/dates'
+import { formatearDniCuil } from '../utils/clientIdentity'
 
 export const useProximosServicios = () => {
   const { vehiculos, servicios, obtenerClientePorId, obtenerServiciosPorVehiculo } = useAutoService()
@@ -18,7 +19,7 @@ export const useProximosServicios = () => {
       const serviciosVehiculo = obtenerServiciosPorVehiculo(vehiculo.id)
       
       const ultimoServicio = serviciosVehiculo
-        .filter(s => s.proximoServicio)
+        .filter(s => s.estado !== 'cancelado')
         .sort((a, b) => parsearFechaLocal(b.fechaServicio) - parsearFechaLocal(a.fechaServicio))[0]
 
       if (ultimoServicio && ultimoServicio.proximoServicio) {
@@ -39,6 +40,7 @@ export const useProximosServicios = () => {
           fecha_proximo_servicio: ultimoServicio.proximoServicio,
           dias_restantes: diasRestantes, estado, prioridad,
           cliente_nombre: cliente?.nombre || 'Sin cliente',
+          cliente_dni_cuil: formatearDniCuil(cliente?.dniCuil),
           cliente_telefono: cliente?.telefono || 'Sin teléfono',
           cliente_email: cliente?.email || 'Sin email',
           vehiculo_marca: vehiculo.marca, vehiculo_modelo: vehiculo.modelo,
@@ -58,13 +60,13 @@ export const useProximosServicios = () => {
   const convertirACSV = (datos) => {
     if (datos.length === 0) { return '' }
     const headers = [
-      'Fecha Próximo Servicio', 'Días Restantes', 'Estado', 'Prioridad', 'Cliente', 'Teléfono',
+      'Fecha Próximo Servicio', 'Días Restantes', 'Estado', 'Prioridad', 'Cliente', 'DNI/CUIL', 'Teléfono',
       'Email', 'Marca', 'Modelo', 'Patente', 'Año', 'Color', 'Último Servicio (Fecha)',
       'Último Servicio (Tipo)', 'Último Servicio (KM)', 'Último Servicio (Costo)', 'Observaciones'
     ]
     const filas = datos.map(s => [
       formatearFecha(s.fecha_proximo_servicio),
-      s.dias_restantes, s.estado, s.prioridad, `"${s.cliente_nombre}"`, s.cliente_telefono,
+      s.dias_restantes, s.estado, s.prioridad, `"${s.cliente_nombre}"`, s.cliente_dni_cuil || '', s.cliente_telefono,
       s.cliente_email, s.vehiculo_marca, s.vehiculo_modelo, s.vehiculo_patente, s.vehiculo_año,
       s.vehiculo_color, formatearFecha(s.ultimo_servicio_fecha),
       `"${s.ultimo_servicio_tipo}"`, s.ultimo_servicio_km, s.ultimo_servicio_costo, `"${s.observaciones}"`

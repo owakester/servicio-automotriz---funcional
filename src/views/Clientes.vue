@@ -20,7 +20,7 @@
     <input
     v-model="filtroTexto"
     type="text"
-    placeholder="Buscar por nombre, email o teléfono..."
+    placeholder="Buscar por nombre, DNI/CUIL, email o teléfono..."
       class="input-field pl-10"
         aria-label="Buscar clientes"
         />
@@ -46,6 +46,9 @@
             <div class="ml-3">
               <h3 class="text-lg font-semibold text-gray-900">{{ cliente.nombre }}</h3>
               <p class="text-sm text-gray-500">{{ cliente.email }}</p>
+              <p v-if="cliente.dniCuil" class="text-sm text-gray-600">
+                DNI/CUIL: {{ formatearDniCuil(cliente.dniCuil) }}
+              </p>
             </div>
           </div>
           <div class="flex space-x-2">
@@ -182,6 +185,28 @@
           </div>
 
           <div>
+            <label for="client-document" class="block text-sm font-medium text-gray-700 mb-1">
+              DNI/CUIL (opcional)
+            </label>
+            <input
+              v-model="formulario.dniCuil"
+              id="client-document"
+              type="text"
+              inputmode="numeric"
+              :class="['input-field', getError('dniCuil') ? 'border-red-300 focus:ring-red-500' : '']"
+              placeholder="Ej.: 12345678 o 20-12345678-6"
+              :aria-invalid="Boolean(getError('dniCuil'))"
+              :aria-describedby="getError('dniCuil') ? 'client-document-help client-document-error' : 'client-document-help'"
+            />
+            <p id="client-document-help" class="mt-1 text-xs text-gray-500">
+              DNI: 7 u 8 dígitos. CUIL: 11 dígitos. Podés usar puntos o guiones.
+            </p>
+            <p v-if="getError('dniCuil')" id="client-document-error" class="mt-1 text-sm text-red-600">
+              {{ getError('dniCuil') }}
+            </p>
+          </div>
+
+          <div>
             <label for="client-email" class="block text-sm font-medium text-gray-700 mb-1">
               Email *
             </label>
@@ -274,7 +299,7 @@
     <ConfirmDialog
       :show="mostrarConfirmacion"
       title="Eliminar Cliente"
-      :message="`¿Estás seguro de que deseas eliminar al cliente ${clienteAEliminar?.nombre}?`"
+      :message="`¿Estás seguro de que deseas eliminar al cliente ${etiquetaCliente(clienteAEliminar)}?`"
       confirm-text="Eliminar"
       cancel-text="Cancelar"
       type="danger"
@@ -304,6 +329,7 @@ import { useDebounce, useMemoize } from '../composables/useOptimization'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import { useNotifications } from '../composables/useNotifications'
 import PaginationControls from '../components/PaginationControls.vue'
+import { formatearDniCuil, etiquetaCliente } from '../utils/clientIdentity'
 
 const {
   clientes,
@@ -320,6 +346,7 @@ const {
   validateRequired,
   validateEmail,
   validatePhone,
+  validateDniCuil,
   hasErrors,
   getError,
   clearErrors
@@ -354,6 +381,7 @@ const filtroTexto = useDebounce(searchQuery, 300)
 // Formulario
 const formulario = ref({
   nombre: '',
+  dniCuil: '',
   email: '',
   telefono: '',
   direccion: '',
@@ -385,6 +413,7 @@ const obtenerVehiculosPorCliente = (clienteId) => {
 const limpiarFormulario = () => {
   formulario.value = {
     nombre: '',
+    dniCuil: '',
     email: '',
     telefono: '',
     direccion: '',
@@ -394,7 +423,7 @@ const limpiarFormulario = () => {
 
 const editarCliente = (cliente) => {
   clienteEditando.value = cliente
-  formulario.value = { ...cliente }
+  formulario.value = { dniCuil: '', ...cliente }
   mostrarFormulario.value = true
 }
 
@@ -403,6 +432,7 @@ const guardarCliente = () => {
   clearErrors()
   const esValido = [
     validateRequired(formulario.value.nombre, 'nombre'),
+    validateDniCuil(formulario.value.dniCuil),
     validateRequired(formulario.value.email, 'email'),
     validateEmail(formulario.value.email, 'email'),
     validateRequired(formulario.value.telefono, 'telefono'),

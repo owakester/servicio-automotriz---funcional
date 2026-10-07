@@ -58,7 +58,7 @@
           <input
             v-model="filtroTexto"
             type="text"
-            placeholder="Buscar por número de orden..."
+            placeholder="Buscar por orden, trabajo, cliente o DNI/CUIL..."
             class="input-field"
           />
         </div>
@@ -111,7 +111,7 @@
           <tbody>
             <tr v-for="orden in ordenesFiltradas" :key="orden.id">
               <td class="font-medium text-primary-600">{{ orden.numeroOrden }}</td>
-              <td>{{ orden.cliente?.nombre || 'Sin cliente' }}</td>
+              <td><ClienteIdentificacion :cliente="orden.cliente" /></td>
               <td>
                 <div class="text-sm">
                   <div class="font-medium">{{ orden.vehiculo?.marca }} {{ orden.vehiculo?.modelo }}</div>
@@ -266,7 +266,7 @@
                 Cliente
               </label>
               <input
-                :value="clienteSeleccionado?.nombre || ''"
+                :value="etiquetaCliente(clienteSeleccionado)"
                 id="order-client"
                 type="text"
                 readonly
@@ -441,6 +441,8 @@ import { useGoogleDrive } from '../composables/useGoogleDrive'
 import { useNotifications } from '../composables/useNotifications'
 import { estaFechaVencida, formatearFecha, fechaParaInput } from '../utils/dates'
 import { useFechaActual } from '../composables/useFechaActual'
+import ClienteIdentificacion from '../components/ClienteIdentificacion.vue'
+import { etiquetaCliente, coincideDniCuil } from '../utils/clientIdentity'
 
 const { fechaActual } = useFechaActual()
 
@@ -507,7 +509,9 @@ const ordenesFiltradas = computed(() => {
     const filtro = filtroTexto.value.toLowerCase()
     resultado = resultado.filter(orden => 
       orden.numeroOrden.toLowerCase().includes(filtro) ||
-      orden.descripcionTrabajo?.toLowerCase().includes(filtro)
+      orden.descripcionTrabajo?.toLowerCase().includes(filtro) ||
+      orden.cliente?.nombre?.toLowerCase().includes(filtro) ||
+      coincideDniCuil(orden.cliente?.dniCuil, filtro)
     )
   }
 

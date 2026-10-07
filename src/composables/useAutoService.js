@@ -22,6 +22,7 @@ import {
 } from '../utils/dataIntegrity'
 import { diasHastaFecha, estaFechaVencida, inicioDelDia, parsearFechaLocal } from '../utils/dates'
 import { useFechaActual } from './useFechaActual'
+import { esDniCuilValido, normalizarDniCuil } from '../utils/clientIdentity'
 
 // Estado global de la aplicación
 const clientes = ref([])
@@ -481,6 +482,10 @@ Todo perfecto! ✨
       error('El cliente necesita un nombre')
       return null
     }
+    if (!esDniCuilValido(cliente.dniCuil)) {
+      error('Ingresá un DNI de 7 u 8 dígitos o un CUIL de 11 dígitos')
+      return null
+    }
     const email = normalizarEmail(cliente.email)
     if (email && existeValorDuplicado(clientes.value, 'email', email)) {
       error('Ya existe un cliente con ese email')
@@ -491,6 +496,7 @@ Todo perfecto! ✨
       id: crearIdUnico(),
       ...cliente,
       email,
+      dniCuil: normalizarDniCuil(cliente.dniCuil),
       telefono: limpiarTelefono(cliente.telefono || ''),
       fechaCreacion: new Date().toISOString()
     }
@@ -508,6 +514,10 @@ Todo perfecto! ✨
         error('El cliente necesita un nombre')
         return null
       }
+      if (!esDniCuilValido(clienteCombinado.dniCuil)) {
+        error('Ingresá un DNI de 7 u 8 dígitos o un CUIL de 11 dígitos')
+        return null
+      }
       const email = normalizarEmail(clienteCombinado.email)
       if (email && existeValorDuplicado(clientes.value, 'email', email, id)) {
         error('Ya existe un cliente con ese email')
@@ -516,6 +526,7 @@ Todo perfecto! ✨
       const datosActualizados = {
         ...clienteCombinado,
         email,
+        dniCuil: normalizarDniCuil(clienteCombinado.dniCuil),
         telefono: limpiarTelefono(clienteCombinado.telefono || '')
       }
       clientes.value[index] = { ...clientes.value[index], ...datosActualizados }
@@ -776,6 +787,7 @@ Todo perfecto! ✨
     return vehiculos.value.map(vehiculo => {
       const serviciosVehiculo = obtenerServiciosPorVehiculo(vehiculo.id)
       const ultimoServicio = serviciosVehiculo
+        .filter(servicio => servicio.estado !== 'cancelado')
         .sort((a, b) => parsearFechaLocal(b.fechaServicio) - parsearFechaLocal(a.fechaServicio))[0]
 
       let alerta = null

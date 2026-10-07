@@ -1,5 +1,6 @@
 import { useAutoService } from './useAutoService'
 import { formatearFecha, inicioDelDia, parsearFechaLocal } from '../utils/dates'
+import { formatearDniCuil } from '../utils/clientIdentity'
 
 export const useReports = () => {
   const { clientes, vehiculos, servicios, obtenerClientePorId, obtenerVehiculoPorId } = useAutoService()
@@ -51,7 +52,7 @@ export const useReports = () => {
   }
 
   // Reporte de clientes más frecuentes
-  const getClientesFrecuentes = (limite = 10) => {
+  const getClientesFrecuentes = (limite = 10, incluirSinServicios = false) => {
     const clientesConServicios = clientes.value.map(cliente => {
       const serviciosCliente = servicios.value.filter(s => String(s.clienteId) === String(cliente.id) && s.estado === 'completado')
       const totalGastado = serviciosCliente.reduce((total, servicio) => 
@@ -66,7 +67,7 @@ export const useReports = () => {
           .sort((a, b) => parsearFechaLocal(b.fechaServicio) - parsearFechaLocal(a.fechaServicio))[0]
       }
     })
-    .filter(cliente => cliente.cantidadServicios > 0)
+    .filter(cliente => incluirSinServicios || cliente.cantidadServicios > 0)
     .sort((a, b) => b.cantidadServicios - a.cantidadServicios)
     .slice(0, limite)
 
@@ -160,6 +161,7 @@ export const useReports = () => {
     const columnas = {
       'Fecha': (s) => formatearFecha(s.fechaServicio),
       'Cliente': (s) => s.cliente?.nombre || '',
+      'DNI/CUIL': (s) => formatearDniCuil(s.cliente?.dniCuil),
       'Vehículo': (s) => `${s.vehiculo?.marca || ''} ${s.vehiculo?.modelo || ''}`,
       'Patente': (s) => s.vehiculo?.patente || '',
       'Tipo de Servicio': (s) => s.tipoServicio,
@@ -174,10 +176,11 @@ export const useReports = () => {
 
   // Exportar clientes a CSV
   const exportarClientes = () => {
-    const clientesConDatos = getClientesFrecuentes(clientes.value.length)
+    const clientesConDatos = getClientesFrecuentes(clientes.value.length, true)
     
     const columnas = {
       'Nombre': (c) => c.nombre,
+      'DNI/CUIL': (c) => formatearDniCuil(c.dniCuil),
       'Email': (c) => c.email,
       'Teléfono': (c) => c.telefono,
       'Dirección': (c) => c.direccion || '',

@@ -24,7 +24,7 @@
           <input
             v-model="filtroTexto"
             type="text"
-            placeholder="Buscar por patente, marca o modelo..."
+            placeholder="Buscar por patente, marca, modelo, cliente o DNI/CUIL..."
             class="input-field"
           />
         </div>
@@ -32,7 +32,7 @@
           <select v-model="filtroCliente" class="input-field">
             <option value="">Todos los clientes</option>
             <option v-for="cliente in clientes" :key="cliente.id" :value="cliente.id">
-              {{ cliente.nombre }}
+              {{ etiquetaCliente(cliente) }}
             </option>
           </select>
         </div>
@@ -123,7 +123,7 @@
         <div class="space-y-2">
           <div class="flex items-center text-sm text-gray-600">
             <User class="h-4 w-4 mr-2" />
-            {{ vehiculo.cliente?.nombre || 'Sin cliente asignado' }}
+            <ClienteIdentificacion :cliente="vehiculo.cliente" alternativa="Sin cliente asignado" />
           </div>
           <div class="flex items-center text-sm text-gray-600">
             <Calendar class="h-4 w-4 mr-2" />
@@ -236,7 +236,7 @@
             >
               <option value="">Seleccionar cliente</option>
               <option v-for="cliente in clientes" :key="cliente.id" :value="cliente.id">
-                {{ cliente.nombre }}
+                {{ etiquetaCliente(cliente) }}
               </option>
             </select>
             <input
@@ -433,6 +433,8 @@ import { useAutoService } from '../composables/useAutoService'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import { useNotifications } from '../composables/useNotifications'
 import { formatearFecha } from '../utils/dates'
+import ClienteIdentificacion from '../components/ClienteIdentificacion.vue'
+import { etiquetaCliente, coincideDniCuil } from '../utils/clientIdentity'
 
 const router = useRouter()
 const route = useRoute()
@@ -476,7 +478,7 @@ const formulario = ref({
 
 // Computed
 const nombreClienteRegistrado = computed(() =>
-  clientes.value.find(cliente => String(cliente.id) === String(vehiculoEditando.value?.clienteId))?.nombre || 'Cliente no encontrado'
+  etiquetaCliente(clientes.value.find(cliente => String(cliente.id) === String(vehiculoEditando.value?.clienteId)), 'Cliente no encontrado')
 )
 
 const vehiculosFiltrados = computed(() => {
@@ -488,7 +490,9 @@ const vehiculosFiltrados = computed(() => {
     resultado = resultado.filter(vehiculo => 
       vehiculo.patente.toLowerCase().includes(filtro) ||
       vehiculo.marca.toLowerCase().includes(filtro) ||
-      vehiculo.modelo.toLowerCase().includes(filtro)
+      vehiculo.modelo.toLowerCase().includes(filtro) ||
+      vehiculo.cliente?.nombre?.toLowerCase().includes(filtro) ||
+      coincideDniCuil(vehiculo.cliente?.dniCuil, filtro)
     )
   }
   
