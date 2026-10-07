@@ -1,6 +1,7 @@
 import { useNotifications } from './useNotifications'
 import { formatearFecha } from '../utils/dates'
 import { formatearDniCuil } from '../utils/clientIdentity'
+import brand from '../assets/brand.json'
 
 export const usePDF = () => {
   const { success, error } = useNotifications()
@@ -27,11 +28,13 @@ export const usePDF = () => {
               padding-bottom: 20px; 
               margin-bottom: 20px; 
             }
-            .company-name { 
-              font-size: 24px; 
-              font-weight: bold; 
-              color: #2563eb; 
-              margin-bottom: 5px; 
+            .company-logo {
+              display: block;
+              width: 180px;
+              height: 84px;
+              object-fit: cover;
+              object-position: center 60%;
+              margin: 0 auto 12px;
             }
             .order-number { 
               font-size: 18px; 
@@ -136,12 +139,13 @@ export const usePDF = () => {
             @media print {
               body { margin: 0; }
               .section { break-inside: avoid; }
+              .header { break-inside: avoid; }
             }
           </style>
         </head>
         <body>
           <div class="header">
-            <div class="company-name">AutoService Pro</div>
+            <img class="company-logo" src="${brand.logo}" alt="${brand.nombre}" width="180" height="84">
             <div class="order-number">Orden de Mantenimiento: ${orden.numeroOrden}</div>
             <div style="color: #6b7280; font-size: 14px;">
               Fecha: ${formatearFecha(orden.fechaCreacion)}
@@ -235,7 +239,7 @@ export const usePDF = () => {
           ` : ''}
 
           <div class="footer">
-            <p>AutoService Pro - Sistema de Gestión Automotriz</p>
+            <p>${brand.nombre} - Sistema de Gestión Automotriz</p>
             <p>Generado el ${new Date().toLocaleDateString('es-ES')} a las ${new Date().toLocaleTimeString('es-ES')}</p>
           </div>
         </body>

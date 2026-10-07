@@ -5,8 +5,9 @@
       <div class="max-w-7xl mx-auto px-4">
         <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center py-2 sm:py-0 sm:h-16 gap-2">
           <div class="flex items-center flex-shrink-0">
-            <Car class="h-8 w-8 text-primary-600 mr-2" aria-hidden="true" />
-            <span class="text-xl font-bold text-gray-900">ServiceCar</span>
+            <router-link to="/dashboard" class="brand-link" aria-label="Brabus Service — ir al inicio">
+              <img :src="brand.logo" :alt="brand.nombre" class="brand-logo" width="128" height="56" />
+            </router-link>
             <RecordatoriosServicios />
           </div>
           
@@ -47,6 +48,7 @@
 
 <script setup>
 import { onMounted, onUnmounted, inject } from 'vue'
+import brand from './assets/brand.json'
 import { Car, BarChart3, Users, Wrench, FileText, Settings, ClipboardList, HelpCircle } from 'lucide-vue-next'
 import NotificationContainer from './components/NotificationContainer.vue'
 import WhatsAppFloatingButton from './components/WhatsAppFloatingButton.vue'
@@ -77,3 +79,23 @@ const navigation = [
   { name: 'Ayuda', path: '/ayuda', label: 'Ayuda', icon: HelpCircle }
 ]
 </script>
+
+<style scoped>
+.brand-link {
+  display: block;
+  flex-shrink: 0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.brand-link:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
+}
+.brand-logo {
+  display: block;
+  width: 128px;
+  height: 56px;
+  object-fit: cover;
+  object-position: center 60%;
+}
+</style>

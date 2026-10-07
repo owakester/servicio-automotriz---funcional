@@ -1,9 +1,14 @@
 import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import App from './App.vue'
+import brand from './assets/brand.json'
 import './style.css'
 import { useBackupSystem } from './composables/useBackupSystem'
 import { focusTrap } from './directives/focusTrap'
+
+// La misma imagen identifica el portal, la pestaña y los comprobantes.
+const favicon = document.querySelector('link[rel="icon"]')
+if (favicon) favicon.href = brand.logo
 
 // Dashboard se carga inmediatamente por ser la página principal
 import Dashboard from './views/Dashboard.vue'

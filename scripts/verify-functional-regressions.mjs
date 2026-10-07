@@ -318,6 +318,13 @@ try {
       assert.ok(mod.usePDF().generarPDFOrden(printOrder))
       assert.match(printedHTML, /DNI\/CUIL:/)
       assert.match(printedHTML, /20-12345678-6/)
+      const brand = JSON.parse(readFileSync('src/assets/brand.json', 'utf8'))
+      assert.match(printedHTML, /alt="Brabus Service"/)
+      assert.ok(printedHTML.includes(`src="${brand.logo}"`), 'el logo debe estar embebido para imprimir sin conexión')
+      assert.match(brand.logo, /^data:image\/jpeg;base64,/)
+      assert.equal(Buffer.from(brand.logo.split(',')[1], 'base64').subarray(0, 3).toString('hex'), 'ffd8ff')
+      assert.match(printedHTML, /Brabus Service - Sistema de Gestión Automotriz/)
+      assert.doesNotMatch(printedHTML, /AutoService Pro/)
     } finally {
       globalThis.window = originalWindow
       app.reemplazarDatos(before)
