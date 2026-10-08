@@ -208,13 +208,12 @@
 
           <div>
             <label for="client-email" class="block text-sm font-medium text-gray-700 mb-1">
-              Email *
+              Email (opcional)
             </label>
             <input
               v-model="formulario.email"
               id="client-email"
               type="email"
-              required
               :class="[
                 'input-field',
                 getError('email') ? 'border-red-300 focus:ring-red-500' : ''
@@ -433,7 +432,6 @@ const guardarCliente = () => {
   const esValido = [
     validateRequired(formulario.value.nombre, 'nombre'),
     validateDniCuil(formulario.value.dniCuil),
-    validateRequired(formulario.value.email, 'email'),
     validateEmail(formulario.value.email, 'email'),
     validateRequired(formulario.value.telefono, 'telefono'),
     validatePhone(formulario.value.telefono, 'telefono')

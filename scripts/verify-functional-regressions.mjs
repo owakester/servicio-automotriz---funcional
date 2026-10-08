@@ -41,6 +41,8 @@ const compiled = await build({
       "export { useProximosServicios } from './src/composables/useProximosServicios.js'",
       "export { useNotifications } from './src/composables/useNotifications.js'",
       "export { default as OrdenesView } from './src/views/OrdenesMantenimiento.vue'",
+      "export { default as ClientesView } from './src/views/Clientes.vue'",
+      "export { default as ServiciosView } from './src/views/Servicios.vue'",
       "export { createSSRApp, h } from 'vue'",
       "export { renderToString } from '@vue/server-renderer'",
       "export { createRouter, createMemoryHistory } from 'vue-router'",
@@ -56,7 +58,7 @@ const compiled = await build({
     name: 'order-form-script',
     setup(builder) {
       builder.onLoad({ filter: /\.vue$/ }, ({ path }) => {
-        if (!path.endsWith('OrdenesMantenimiento.vue')) return { contents: 'export default {}', loader: 'js' }
+        if (!/[/\\](OrdenesMantenimiento|Clientes|Servicios)\.vue$/.test(path)) return { contents: 'export default {}', loader: 'js' }
         const { descriptor } = parse(readFileSync(path, 'utf8'))
         return { contents: compileScript(descriptor, { id: 'order-form-regression' }).content, loader: 'js' }
       })
@@ -369,6 +371,81 @@ try {
       if (originalWindow === undefined) delete globalThis.window
       else globalThis.window = originalWindow
     }
+  })
+
+  await check('correo opcional, selección por cliente y consulta de servicios no alteran datos ni relaciones', async () => {
+    const before = JSON.parse(JSON.stringify(current(app)))
+    const view = async (component) => {
+      let form
+      const screen = mod.createSSRApp({ setup() {
+        form = component.setup({}, { expose() {} })
+        return () => mod.h('div')
+      } })
+      screen.use(mod.createRouter({ history: mod.createMemoryHistory('/'), routes: [{ path: '/', component: {} }] }))
+      await mod.renderToString(screen)
+      return form
+    }
+    try {
+      const clientsForm = await view(mod.ClientesView)
+      clientsForm.formulario.value = { nombre: 'Cliente sin correo', telefono: '1155554444', email: '', dniCuil: '12345678' }
+      clientsForm.guardarCliente()
+      const noEmail = app.clientes.value.find(c => c.nombre === 'Cliente sin correo')
+      assert.ok(noEmail)
+      assert.equal(noEmail.email, '')
+      clientsForm.editarCliente(noEmail)
+      clientsForm.formulario.value.email = 'mal-formato'
+      clientsForm.guardarCliente()
+      assert.equal(clientsForm.getError('email'), 'Formato de email inválido')
+      assert.equal(app.obtenerClientePorId(noEmail.id).email, '')
+      clientsForm.formulario.value.email = 'opcional@example.com'
+      clientsForm.guardarCliente()
+      clientsForm.editarCliente(app.obtenerClientePorId(noEmail.id))
+      clientsForm.formulario.value.email = ''
+      clientsForm.guardarCliente()
+      assert.equal(app.obtenerClientePorId(noEmail.id).email, '')
+
+      const multiple = app.agregarCliente({ nombre: 'Dos vehículos', dniCuil: '87654321' })
+      const first = app.agregarVehiculo({ clienteId: noEmail.id, marca: 'Ford', modelo: 'Focus', patente: 'QA111BC' })
+      const second = app.agregarVehiculo({ clienteId: multiple.id, marca: 'Fiat', modelo: 'Uno', patente: 'QA222BC' })
+      const third = app.agregarVehiculo({ clienteId: multiple.id, marca: 'Ford', modelo: 'Ka', patente: 'QA333BC' })
+      const empty = app.agregarCliente({ nombre: 'Sin vehículos' })
+      const orderForm = await view(mod.OrdenesView)
+      orderForm.busquedaCliente.value = '12.345.678'
+      assert.deepEqual(orderForm.clientesDisponibles.value.map(c => c.id), [noEmail.id])
+      orderForm.formulario.value.clienteId = String(noEmail.id)
+      orderForm.onClienteChange()
+      assert.equal(orderForm.formulario.value.vehiculoId, first.id)
+      assert.deepEqual(orderForm.vehiculosDisponibles.value.map(v => v.id), [first.id])
+      orderForm.formulario.value.clienteId = multiple.id
+      orderForm.onClienteChange()
+      assert.equal(orderForm.formulario.value.vehiculoId, '')
+      assert.deepEqual(orderForm.vehiculosDisponibles.value.map(v => v.id), [second.id, third.id])
+      orderForm.formulario.value.vehiculoId = second.id
+      orderForm.onVehiculoChange()
+      assert.equal(orderForm.formulario.value.clienteId, multiple.id)
+      orderForm.formulario.value.clienteId = empty.id
+      orderForm.onClienteChange()
+      assert.equal(orderForm.vehiculosDisponibles.value.length, 0)
+      assert.equal(orderForm.formulario.value.vehiculoId, '')
+      const count = app.ordenes.value.length
+      orderForm.guardarOrden()
+      assert.equal(app.ordenes.value.length, count)
+      orderForm.formulario.value = { vehiculoId: first.id, clienteId: multiple.id, descripcionTrabajo: 'Cliente derivado del vehículo', estado: 'pendiente', prioridad: 'media' }
+      orderForm.guardarOrden()
+      assert.equal(app.ordenes.value.at(-1).clienteId, noEmail.id)
+      assert.equal(app.ordenes.value.at(-1).vehiculoId, first.id)
+
+      const serviceForm = await view(mod.ServiciosView)
+      const snapshot = JSON.stringify(current(app))
+      const existing = serviceForm.serviciosConRelaciones.value[0]
+      assert.ok(existing)
+      await serviceForm.verServicio(existing)
+      assert.equal(serviceForm.servicioDetalle.value.id, existing.id)
+      assert.equal(serviceForm.mostrarFormulario.value, false)
+      serviceForm.cerrarDetalle()
+      assert.equal(serviceForm.servicioDetalle.value, null)
+      assert.equal(JSON.stringify(current(app)), snapshot)
+    } finally { app.reemplazarDatos(before) }
   })
 
   await snapshotSettled()

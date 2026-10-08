@@ -56,7 +56,7 @@
         <ol class="list-decimal pl-5 space-y-2 text-gray-700">
           <li>Entrá en <strong>Clientes</strong> y seleccioná <strong>Nuevo Cliente</strong>.</li>
           <li>Podés completar el <strong>DNI/CUIL</strong> para identificar al cliente y buscarlo por documento. Es opcional: DNI de 7 u 8 dígitos, o CUIL de 11, con o sin puntos y guiones.</li>
-          <li>Completá nombre, email y teléfono.</li>
+          <li>Completá nombre y teléfono. El email es opcional; podés dejarlo vacío si el cliente no tiene correo.</li>
           <li>Presioná <strong>Crear</strong>.</li>
           <li>Usá Editar para corregir información o WhatsApp para comunicarte.</li>
         </ol>
@@ -86,7 +86,7 @@
         <p class="text-gray-700 mb-3">La orden representa el trabajo que ingresa al taller.</p>
         <ol class="list-decimal pl-5 space-y-2 text-gray-700">
           <li>Entrá en <strong>Órdenes</strong> y seleccioná <strong>Nueva Orden</strong>.</li>
-          <li>Elegí el vehículo; el cliente se completa automáticamente.</li>
+          <li>Podés buscar al cliente por nombre o DNI/CUIL y elegir uno de sus vehículos. Si tiene uno solo, se selecciona automáticamente. También podés elegir directamente el vehículo; su cliente se completa automáticamente.</li>
           <li>Describí claramente el trabajo solicitado.</li>
           <li>Actualizá el estado: Pendiente, En proceso o Completada.</li>
         </ol>
@@ -102,6 +102,7 @@
           <li>Entrá en <strong>Servicios</strong> y seleccioná <strong>Nuevo Servicio</strong>.</li>
           <li>Elegí vehículo, tipo de trabajo, fecha, estado y costo final.</li>
           <li>Agregá kilometraje, observaciones y próximo servicio.</li>
+          <li>Para consultar el trabajo sin modificarlo, usá el icono del ojo (<strong>Ver detalle</strong>) en Servicios. Allí verás descripción, observaciones, fechas, kilometraje y costo. Usá el lápiz solo cuando necesites editar.</li>
           <li>En mantenimiento general, la próxima fecha se propone automáticamente.</li>
           <li>La <strong>campana</strong> junto al nombre del programa muestra los próximos mantenimientos vencidos, los que vencen hoy y los de los próximos 7 días. Recibirás un resumen diario mientras el programa esté abierto; podés desactivarlo desde esa lista. No se envían correos ni WhatsApp automáticamente.</li>
         </ol>

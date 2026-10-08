@@ -243,6 +243,16 @@
         <form @submit.prevent="guardarOrden" class="space-y-4">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
+              <label for="order-client-search" class="block text-sm font-medium text-gray-700 mb-1">Buscar cliente</label>
+              <input id="order-client-search" v-model="busquedaCliente" type="search" class="input-field mb-2" placeholder="Nombre o DNI/CUIL" />
+              <label for="order-client" class="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
+              <select id="order-client" v-model="formulario.clienteId" @change="onClienteChange" class="input-field">
+                <option value="">Todos los clientes / elegir por vehículo</option>
+                <option v-for="cliente in clientesDisponibles" :key="cliente.id" :value="cliente.id">{{ etiquetaCliente(cliente) }}</option>
+              </select>
+              <p v-if="busquedaCliente.trim() && clientesDisponibles.length === 0" class="mt-1 text-sm text-gray-500">No se encontraron clientes.</p>
+            </div>
+            <div>
               <label for="order-vehicle" class="block text-sm font-medium text-gray-700 mb-1">
                 Vehículo *
               </label>
@@ -255,24 +265,11 @@
                 class="input-field"
               >
                 <option value="">Seleccionar vehículo</option>
-                <option v-for="vehiculo in vehiculos" :key="vehiculo.id" :value="vehiculo.id">
+                <option v-for="vehiculo in vehiculosDisponibles" :key="vehiculo.id" :value="vehiculo.id">
                   {{ vehiculo.marca }} {{ vehiculo.modelo }} - {{ vehiculo.patente }}
                 </option>
               </select>
-            </div>
-
-            <div>
-              <label for="order-client" class="block text-sm font-medium text-gray-700 mb-1">
-                Cliente
-              </label>
-              <input
-                :value="etiquetaCliente(clienteSeleccionado)"
-                id="order-client"
-                type="text"
-                readonly
-                class="input-field bg-gray-50"
-                placeholder="Se selecciona automáticamente"
-              />
+              <p class="mt-1 text-sm text-gray-500">{{ formulario.clienteId && vehiculosDisponibles.length === 0 ? 'Este cliente no tiene vehículos. Registrá uno en Vehículos para crear la orden.' : 'Podés elegir primero el cliente o directamente el vehículo.' }}</p>
             </div>
           </div>
 
@@ -458,6 +455,7 @@ const {
 } = useOrdenes()
 
 const { 
+  clientes,
   vehiculos, 
   obtenerVehiculoPorId, 
   obtenerClientePorId,
@@ -477,6 +475,7 @@ const filtroTexto = ref('')
 const filtroEstado = ref('')
 const filtroPrioridad = ref('')
 const filtroVehiculo = ref('')
+const busquedaCliente = ref('')
 const mostrarConfirmacion = ref(false)
 const googleDriveEnabled = ref(true)
 const isConnecting = ref(false)
@@ -539,13 +538,23 @@ const hayFiltros = computed(() =>
   filtroTexto.value || filtroEstado.value || filtroPrioridad.value || filtroVehiculo.value
 )
 
-const clienteSeleccionado = computed(() => {
-  if (formulario.value.vehiculoId) {
-    const vehiculo = obtenerVehiculoPorId(parseInt(formulario.value.vehiculoId))
-    return vehiculo ? obtenerClientePorId(vehiculo.clienteId) : null
-  }
-  return null
+const clientesDisponibles = computed(() => {
+  const texto = busquedaCliente.value.trim().toLocaleLowerCase('es')
+  return clientes.value.filter(cliente =>
+    String(cliente.id) === String(formulario.value.clienteId) || !texto ||
+    cliente.nombre?.toLocaleLowerCase('es').includes(texto) || coincideDniCuil(cliente.dniCuil, texto)
+  )
 })
+const vehiculosDisponibles = computed(() => vehiculos.value.filter(vehiculo =>
+  !formulario.value.clienteId || String(vehiculo.clienteId) === String(formulario.value.clienteId)
+))
+const onClienteChange = () => {
+  const disponibles = vehiculosDisponibles.value
+  if (!disponibles.some(vehiculo => String(vehiculo.id) === String(formulario.value.vehiculoId))) {
+    formulario.value.vehiculoId = ''
+  }
+  if (formulario.value.clienteId && disponibles.length === 1) formulario.value.vehiculoId = disponibles[0].id
+}
 
 // Funciones
 const formatearEstado = (estado) => {
@@ -569,6 +578,7 @@ const formatearPrioridad = (prioridad) => {
 }
 
 const limpiarFormulario = () => {
+  busquedaCliente.value = ''
   formulario.value = {
     vehiculoId: '',
     clienteId: '',
@@ -591,6 +601,7 @@ const onVehiculoChange = () => {
 }
 
 const editarOrden = (orden) => {
+  busquedaCliente.value = ''
   ordenEditando.value = orden
   formulario.value = {
     ...orden,
@@ -603,6 +614,13 @@ const editarOrden = (orden) => {
 }
 
 const guardarOrden = () => {
+  // El cliente siempre pertenece al vehículo; el selector solo facilita encontrarlo.
+  const vehiculo = obtenerVehiculoPorId(Number(formulario.value.vehiculoId))
+  if (!vehiculo || !obtenerClientePorId(vehiculo.clienteId)) {
+    error('Seleccioná un vehículo con un cliente registrado')
+    return
+  }
+  formulario.value.clienteId = vehiculo.clienteId
   const datosOrden = {
     // Las fotos se guardan mediante sus propios eventos. El formulario no debe
     // reenviar una lista antigua de imágenes al actualizar la orden.

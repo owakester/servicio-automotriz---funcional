@@ -156,6 +156,9 @@
               
               <!-- Acciones -->
               <div class="flex justify-end space-x-2">
+                <button @click="verServicio(servicio)" class="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors" title="Ver detalle del servicio" :aria-label="`Ver detalle del servicio ${servicio.tipoServicio} de ${servicio.vehiculo?.patente || 'vehículo'}`">
+                  <Eye class="h-4 w-4" aria-hidden="true" />
+                </button>
                 <button
                   @click="editarServicio(servicio)"
                   class="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
@@ -272,6 +275,9 @@
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                 <div class="flex space-x-2">
+                  <button @click="verServicio(servicio)" class="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors" title="Ver detalle del servicio" :aria-label="`Ver detalle del servicio ${servicio.tipoServicio} de ${servicio.vehiculo?.patente || 'vehículo'}`">
+                    <Eye class="h-4 w-4" aria-hidden="true" />
+                  </button>
                   <button
                     @click="editarServicio(servicio)"
                     class="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
@@ -332,6 +338,29 @@
     </div>
 
     <!-- Modal Formulario -->
+    <div v-if="servicioDetalle" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click.self="cerrarDetalle" @keydown.esc="cerrarDetalle">
+      <section ref="detalleDialogo" v-focus-trap class="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="service-detail-title" tabindex="-1">
+        <div class="flex items-start justify-between gap-4 mb-4">
+          <h2 id="service-detail-title" class="text-xl font-bold text-gray-900">Detalle del servicio</h2>
+          <button type="button" @click="cerrarDetalle" class="p-2 rounded hover:bg-gray-100" aria-label="Cerrar detalle del servicio"><X class="h-5 w-5" aria-hidden="true" /></button>
+        </div>
+        <p class="mb-4 text-sm text-gray-500">Solo lectura: consultar este detalle no modifica el servicio.</p>
+        <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+          <div><dt class="font-semibold text-gray-600">Cliente</dt><dd><ClienteIdentificacion :cliente="servicioDetalle.cliente" /></dd></div>
+          <div><dt class="font-semibold text-gray-600">Vehículo</dt><dd>{{ servicioDetalle.vehiculo?.marca }} {{ servicioDetalle.vehiculo?.modelo }} — {{ servicioDetalle.vehiculo?.patente || 'No especificado' }}</dd></div>
+          <div><dt class="font-semibold text-gray-600">Tipo de servicio</dt><dd>{{ servicioDetalle.tipoServicio }}</dd></div>
+          <div><dt class="font-semibold text-gray-600">Estado</dt><dd>{{ formatearEstado(servicioDetalle.estado) }}</dd></div>
+          <div><dt class="font-semibold text-gray-600">Fecha del servicio</dt><dd>{{ formatearFecha(servicioDetalle.fechaServicio) }}</dd></div>
+          <div><dt class="font-semibold text-gray-600">Próximo servicio</dt><dd>{{ servicioDetalle.proximoServicio ? formatearFecha(servicioDetalle.proximoServicio) : 'No programado' }}</dd></div>
+          <div><dt class="font-semibold text-gray-600">Costo final</dt><dd>${{ Number(servicioDetalle.costo || 0).toLocaleString('es-AR') }}</dd></div>
+          <div><dt class="font-semibold text-gray-600">Kilometraje registrado</dt><dd>{{ servicioDetalle.kilometrajeActual == null ? 'No registrado' : `${Number(servicioDetalle.kilometrajeActual).toLocaleString('es-AR')} km` }}</dd></div>
+          <div class="sm:col-span-2"><dt class="font-semibold text-gray-600">Descripción del trabajo</dt><dd class="whitespace-pre-wrap break-words mt-1">{{ servicioDetalle.descripcion || 'Sin descripción' }}</dd></div>
+          <div class="sm:col-span-2"><dt class="font-semibold text-gray-600">Observaciones</dt><dd class="whitespace-pre-wrap break-words mt-1">{{ servicioDetalle.observaciones || 'Sin observaciones' }}</dd></div>
+        </dl>
+        <div class="flex justify-end mt-6"><button type="button" @click="cerrarDetalle" class="btn-secondary">Cerrar</button></div>
+      </section>
+    </div>
+
     <div
       v-if="mostrarFormulario"
       class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
@@ -548,12 +577,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { 
   Plus, 
   Car, 
   Edit2, 
+  Eye,
+  X,
   Trash2, 
   Wrench,
   Search
@@ -593,6 +624,20 @@ const { safeInterval, detectLeaks } = useMemoryLeakPrevention()
 // Estado del componente
 const mostrarFormulario = ref(false)
 const servicioEditando = ref(null)
+const servicioDetalle = ref(null)
+const detalleDialogo = ref(null)
+let origenDetalle = null
+const verServicio = async (servicio) => {
+  origenDetalle = document.activeElement
+  servicioDetalle.value = servicio
+  await nextTick()
+  detalleDialogo.value?.focus()
+}
+const cerrarDetalle = () => {
+  servicioDetalle.value = null
+  origenDetalle?.focus()
+  origenDetalle = null
+}
 const filtroVehiculo = ref('')
 const filtroCliente = ref('')
 const filtroEstado = ref('')
