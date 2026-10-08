@@ -26,7 +26,8 @@ const result = await build({
     "export { useAutoService } from './src/composables/useAutoService.js'",
     "export { useRecordatoriosServicios, CLAVE_ULTIMO_RECORDATORIO } from './src/composables/useRecordatoriosServicios.js'",
     "export { useFechaActual } from './src/composables/useFechaActual.js'",
-    "export { useNotifications } from './src/composables/useNotifications.js'"
+    "export { useNotifications } from './src/composables/useNotifications.js'",
+    "export { ultimosCompletadosPorVehiculo } from './src/utils/serviceReminders.js'"
   ].join('\n'), resolveDir: process.cwd() },
   bundle: true, format: 'esm', platform: 'node', write: false
 })
@@ -149,6 +150,52 @@ try {
     data.reemplazarDatos({ clientes: data.clientes.value, vehiculos: data.vehiculos.value, servicios: [], ordenes: [] })
     assert.equal(reminders.mostrarResumenDiario(), false)
     assert.equal(reminderNotifications(mod).length, 0)
+  })
+  await check('el nuevo mantenimiento reemplaza el aviso solo al completarse y conserva el historial', async () => {
+    const previous = { id: 10, vehiculoId: 1, clienteId: 1, tipoServicio: 'Mantenimiento general', fechaServicio: '2026-01-06', proximoServicio: '2027-01-06', estado: 'completado' }
+    const recent = { id: 11, vehiculoId: 1, clienteId: 1, tipoServicio: 'Mantenimiento general', fechaServicio: '2026-10-07', proximoServicio: '2027-10-07', estado: 'en_progreso' }
+    data.reemplazarDatos({ clientes: [{ id: 1, nombre: 'Cliente QA' }], vehiculos: [{ id: 1, clienteId: 1, marca: 'Mercedes', modelo: 'C200', patente: 'AD605ZO' }], servicios: [previous, recent], ordenes: [] })
+    mod.useFechaActual().fechaActual.value = '2027-01-05'
+    const latest = () => data.vehiculosConAlertas.value[0].ultimoServicio
+    const state = id => data.obtenerEstadoRecordatorio(data.servicios.value.find(s => s.id === id))
+    assert.equal(latest().id, 10)
+    assert.equal(state(10), 'vigente')
+    assert.equal(state(11), 'pendiente')
+    assert.equal(reminders.recordatorios.value.length, 1)
+    data.actualizarServicio(11, { estado: 'pendiente' })
+    assert.equal(latest().id, 10)
+    data.actualizarServicio(11, { estado: 'completado' })
+    assert.equal(latest().id, 11)
+    assert.equal(state(10), 'reemplazado')
+    assert.equal(state(11), 'vigente')
+    assert.equal(reminders.recordatorios.value.length, 0)
+    assert.equal(data.servicios.value.find(s => s.id === 10).proximoServicio, '2027-01-06')
+    data.actualizarServicio(11, { estado: 'cancelado' })
+    assert.equal(latest().id, 10)
+    assert.equal(state(11), 'cancelado')
+    assert.equal(reminders.recordatorios.value.length, 1)
+    data.actualizarServicio(11, { estado: 'completado', fechaServicio: '2025-10-07' })
+    assert.equal(latest().id, 10)
+    data.actualizarServicio(11, { fechaServicio: '2026-10-07', proximoServicio: null })
+    assert.equal(state(10), 'reemplazado')
+    assert.equal(state(11), 'sin_fecha')
+    assert.equal(reminders.recordatorios.value.length, 0)
+    data.eliminarServicio(11)
+    assert.equal(latest().id, 10)
+    assert.equal(state(10), 'vigente')
+    assert.equal(reminders.recordatorios.value.length, 1)
+    assert.equal(data.servicios.value.length, 1)
+  })
+  await check('desempata servicios del mismo día sin depender del orden y descarta fechas inválidas', async () => {
+    const old = { id: 20, vehiculoId: 1, estado: 'completado', fechaServicio: '2026-10-07', fechaCreacion: '2026-10-07T10:00:00Z' }
+    const newer = { ...old, id: 21, fechaCreacion: '2026-10-07T11:00:00Z' }
+    const invalid = { ...old, id: 30, fechaServicio: 'fecha inválida' }
+    assert.equal(mod.ultimosCompletadosPorVehiculo([old, newer, invalid]).get('1').id, 21)
+    assert.equal(mod.ultimosCompletadosPorVehiculo([invalid, newer, old]).get('1').id, 21)
+    assert.equal(mod.ultimosCompletadosPorVehiculo([{ ...old, fechaCreacion: undefined }, { ...newer, fechaCreacion: undefined }]).get('1').id, 21)
+    data.reemplazarDatos({ clientes: data.clientes.value, vehiculos: data.vehiculos.value, servicios: [{ ...old, clienteId: 1, tipoServicio: 'General', estado: 'en_progreso', proximoServicio: '2026-10-08' }], ordenes: [] })
+    assert.equal(data.vehiculosConAlertas.value[0].ultimoServicio, undefined)
+    assert.equal(reminders.recordatorios.value.length, 0)
   })
   console.log(`${checks}/${checks} pruebas de recordatorios superadas`)
 } catch (error) {

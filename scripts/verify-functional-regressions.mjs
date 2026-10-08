@@ -43,6 +43,7 @@ const compiled = await build({
       "export { default as OrdenesView } from './src/views/OrdenesMantenimiento.vue'",
       "export { default as ClientesView } from './src/views/Clientes.vue'",
       "export { default as ServiciosView } from './src/views/Servicios.vue'",
+      "export { default as ProximoServicio } from './src/components/ProximoServicio.vue'",
       "export { createSSRApp, h } from 'vue'",
       "export { renderToString } from '@vue/server-renderer'",
       "export { createRouter, createMemoryHistory } from 'vue-router'",
@@ -58,9 +59,9 @@ const compiled = await build({
     name: 'order-form-script',
     setup(builder) {
       builder.onLoad({ filter: /\.vue$/ }, ({ path }) => {
-        if (!/[/\\](OrdenesMantenimiento|Clientes|Servicios)\.vue$/.test(path)) return { contents: 'export default {}', loader: 'js' }
+        if (!/[/\\](OrdenesMantenimiento|Clientes|Servicios|ProximoServicio)\.vue$/.test(path)) return { contents: 'export default {}', loader: 'js' }
         const { descriptor } = parse(readFileSync(path, 'utf8'))
-        return { contents: compileScript(descriptor, { id: 'order-form-regression' }).content, loader: 'js' }
+        return { contents: compileScript(descriptor, { id: 'order-form-regression', inlineTemplate: path.endsWith('ProximoServicio.vue') }).content, loader: 'js' }
       })
     }
   }]
@@ -371,6 +372,32 @@ try {
       if (originalWindow === undefined) delete globalThis.window
       else globalThis.window = originalWindow
     }
+  })
+
+  await check('el reporte de próximos servicios coincide con las alertas al completar o cancelar el nuevo mantenimiento', async () => {
+    const before = JSON.parse(JSON.stringify(current(app)))
+    try {
+      const previous = { ...service, id: 301, fechaServicio: '2026-01-06', proximoServicio: '2027-01-06', estado: 'completado' }
+      const recent = { ...service, id: 302, fechaServicio: '2026-10-07', proximoServicio: '2027-10-07', estado: 'en_progreso' }
+      app.reemplazarDatos({ clientes: [client], vehiculos: [car], servicios: [previous, recent], ordenes: [] })
+      const report = mod.useProximosServicios()
+      const badge = (service, campo = 'dias') => mod.renderToString(mod.createSSRApp({ render: () => mod.h(mod.ProximoServicio, { servicio: service, campo }) }))
+      assert.equal(report.obtenerDatosProximosServicios()[0].fecha_proximo_servicio, '2027-01-06')
+      assert.match(await badge(app.servicios.value[1]), /Se activa al completar el servicio/)
+      app.actualizarServicio(302, { estado: 'completado' })
+      assert.equal(report.obtenerDatosProximosServicios().length, 1)
+      assert.equal(report.obtenerDatosProximosServicios()[0].fecha_proximo_servicio, '2027-10-07')
+      assert.equal(app.vehiculosConAlertas.value[0].ultimoServicio.id, 302)
+      const historical = await badge(app.servicios.value[0])
+      assert.match(historical, /Recordatorio reemplazado/)
+      assert.doesNotMatch(historical, /días|Hoy|Mañana/)
+      assert.match(await badge(app.servicios.value[0], 'fecha'), /06\/01\/2027.*Fecha histórica/s)
+      assert.doesNotMatch(await badge(app.servicios.value[1]), /reemplazado|Se activa al completar/)
+      app.actualizarServicio(302, { estado: 'cancelado' })
+      assert.equal(report.obtenerDatosProximosServicios()[0].fecha_proximo_servicio, '2027-01-06')
+      assert.equal(app.servicios.value.length, 2)
+      assert.match(await badge(app.servicios.value[1]), /Sin recordatorio \(cancelado\)/)
+    } finally { app.reemplazarDatos(before) }
   })
 
   await check('correo opcional, selección por cliente y consulta de servicios no alteran datos ni relaciones', async () => {

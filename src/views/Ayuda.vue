@@ -102,6 +102,7 @@
           <li>Entrá en <strong>Servicios</strong> y seleccioná <strong>Nuevo Servicio</strong>.</li>
           <li>Elegí vehículo, tipo de trabajo, fecha, estado y costo final.</li>
           <li>Agregá kilometraje, observaciones y próximo servicio.</li>
+          <li>El recordatorio se activa al marcar el servicio como <strong>Completado</strong>. Un servicio pendiente o en progreso no reemplaza el aviso anterior. Al completar un mantenimiento más reciente del vehículo, el anterior queda en el historial con la leyenda <strong>Recordatorio reemplazado</strong>, sin contar sus días. Si corregís, cancelás o eliminás el nuevo servicio, el aviso anterior puede volver a estar vigente.</li>
           <li>Para consultar el trabajo sin modificarlo, usá el icono del ojo (<strong>Ver detalle</strong>) en Servicios. Allí verás descripción, observaciones, fechas, kilometraje y costo. Usá el lápiz solo cuando necesites editar.</li>
           <li>En mantenimiento general, la próxima fecha se propone automáticamente.</li>
           <li>La <strong>campana</strong> junto al nombre del programa muestra los próximos mantenimientos vencidos, los que vencen hoy y los de los próximos 7 días. Recibirás un resumen diario mientras el programa esté abierto; podés desactivarlo desde esa lista. No se envían correos ni WhatsApp automáticamente.</li>

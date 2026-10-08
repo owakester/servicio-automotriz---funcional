@@ -114,22 +114,13 @@
               <!-- Próximo Servicio -->
               <div>
                 <div class="text-sm text-gray-900">
-                  {{ servicio.proximoServicio ? formatearFecha(servicio.proximoServicio) : 'No programado' }}
+                  <ProximoServicio :servicio="servicio" />
                 </div>
               </div>
               
               <!-- Días Restantes -->
               <div>
-                <span v-if="servicio.proximoServicio" :class="[
-                  'inline-flex px-2 py-1 text-xs font-semibold rounded-full',
-                  calcularDiasRestantes(servicio.proximoServicio) < 0 ? 'bg-red-100 text-red-900' :
-                  calcularDiasRestantes(servicio.proximoServicio) <= 7 ? 'bg-orange-100 text-orange-900' :
-                  calcularDiasRestantes(servicio.proximoServicio) <= 30 ? 'bg-yellow-100 text-yellow-900' :
-                  'bg-green-100 text-green-900'
-                ]">
-                  {{ formatearDiasRestantes(servicio.proximoServicio) }}
-                </span>
-                <span v-else class="text-gray-400 text-xs">-</span>
+                <ProximoServicio :servicio="servicio" campo="dias" />
               </div>
               
               <!-- Estado -->
@@ -243,19 +234,10 @@
                 {{ formatearFecha(servicio.fechaServicio) }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                {{ servicio.proximoServicio ? formatearFecha(servicio.proximoServicio) : 'No programado' }}
+                <ProximoServicio :servicio="servicio" />
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <span v-if="servicio.proximoServicio" :class="[
-                  'inline-flex px-2 py-1 text-xs font-semibold rounded-full',
-                  calcularDiasRestantes(servicio.proximoServicio) < 0 ? 'bg-red-100 text-red-900' :
-                  calcularDiasRestantes(servicio.proximoServicio) <= 7 ? 'bg-orange-100 text-orange-900' :
-                  calcularDiasRestantes(servicio.proximoServicio) <= 30 ? 'bg-yellow-100 text-yellow-900' :
-                  'bg-green-100 text-green-900'
-                ]">
-                  {{ formatearDiasRestantes(servicio.proximoServicio) }}
-                </span>
-                <span v-else class="text-gray-400">-</span>
+                <ProximoServicio :servicio="servicio" campo="dias" />
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <span 
@@ -351,7 +333,7 @@
           <div><dt class="font-semibold text-gray-600">Tipo de servicio</dt><dd>{{ servicioDetalle.tipoServicio }}</dd></div>
           <div><dt class="font-semibold text-gray-600">Estado</dt><dd>{{ formatearEstado(servicioDetalle.estado) }}</dd></div>
           <div><dt class="font-semibold text-gray-600">Fecha del servicio</dt><dd>{{ formatearFecha(servicioDetalle.fechaServicio) }}</dd></div>
-          <div><dt class="font-semibold text-gray-600">Próximo servicio</dt><dd>{{ servicioDetalle.proximoServicio ? formatearFecha(servicioDetalle.proximoServicio) : 'No programado' }}</dd></div>
+          <div><dt class="font-semibold text-gray-600">Próximo servicio</dt><dd><ProximoServicio :servicio="servicioDetalle" /><div class="mt-1"><ProximoServicio :servicio="servicioDetalle" campo="dias" /></div></dd></div>
           <div><dt class="font-semibold text-gray-600">Costo final</dt><dd>${{ Number(servicioDetalle.costo || 0).toLocaleString('es-AR') }}</dd></div>
           <div><dt class="font-semibold text-gray-600">Kilometraje registrado</dt><dd>{{ servicioDetalle.kilometrajeActual == null ? 'No registrado' : `${Number(servicioDetalle.kilometrajeActual).toLocaleString('es-AR')} km` }}</dd></div>
           <div class="sm:col-span-2"><dt class="font-semibold text-gray-600">Descripción del trabajo</dt><dd class="whitespace-pre-wrap break-words mt-1">{{ servicioDetalle.descripcion || 'Sin descripción' }}</dd></div>
@@ -596,9 +578,10 @@ import { useDebounce, useMemoize } from '../composables/useOptimization'
 import { useMemoryLeakPrevention } from '../composables/useMemoryLeakPrevention'
 import VirtualList from '../components/VirtualList.vue'
 import PaginationControls from '../components/PaginationControls.vue'
-import { diasHastaFecha, fechaParaInput, formatearFecha, parsearFechaLocal, sumarAnos } from '../utils/dates'
+import { fechaParaInput, formatearFecha, parsearFechaLocal, sumarAnos } from '../utils/dates'
 import { useFechaActual } from '../composables/useFechaActual'
 import ClienteIdentificacion from '../components/ClienteIdentificacion.vue'
+import ProximoServicio from '../components/ProximoServicio.vue'
 import { etiquetaCliente, coincideDniCuil } from '../utils/clientIdentity'
 
 const { fechaActual } = useFechaActual()
@@ -767,27 +750,6 @@ const formatearEstado = (estado) => {
     cancelado: 'Cancelado'
   }
   return estados[estado] || estado
-}
-
-// FUNCIONES PARA CALCULAR DÍAS RESTANTES
-const calcularDiasRestantes = (fechaProximoServicio) => {
-  return diasHastaFecha(fechaProximoServicio, fechaActual.value)
-}
-
-const formatearDiasRestantes = (fechaProximoServicio) => {
-  const dias = calcularDiasRestantes(fechaProximoServicio)
-  
-  if (dias === null) return '-'
-  
-  if (dias < 0) {
-    return `${Math.abs(dias)} días vencido`
-  } else if (dias === 0) {
-    return 'Hoy'
-  } else if (dias === 1) {
-    return 'Mañana'
-  } else {
-    return `${dias} días`
-  }
 }
 
 const limpiarFormulario = () => {

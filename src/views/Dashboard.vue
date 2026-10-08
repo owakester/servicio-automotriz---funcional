@@ -271,19 +271,10 @@
                 {{ formatearFecha(servicio.fechaServicio) }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                {{ servicio.proximoServicio ? formatearFecha(servicio.proximoServicio) : 'No programado' }}
+                <ProximoServicio :servicio="servicio" />
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <span v-if="servicio.proximoServicio" :class="[
-                  'inline-flex px-2 py-1 text-xs font-semibold rounded-full',
-                  calcularDiasRestantes(servicio.proximoServicio) < 0 ? 'bg-red-100 text-red-900' :
-                  calcularDiasRestantes(servicio.proximoServicio) <= 7 ? 'bg-orange-100 text-orange-900' :
-                  calcularDiasRestantes(servicio.proximoServicio) <= 30 ? 'bg-yellow-100 text-yellow-900' :
-                  'bg-green-100 text-green-900'
-                ]">
-                  {{ formatearDiasRestantes(servicio.proximoServicio) }}
-                </span>
-                <span v-else class="text-gray-400">-</span>
+                <ProximoServicio :servicio="servicio" campo="dias" />
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                 ${{ servicio.costo?.toLocaleString() }}
@@ -316,9 +307,10 @@ import { useOrdenes } from '../composables/useOrdenes'
 import { useMemoize } from '../composables/useOptimization'
 import { usePerformanceMonitor } from '../composables/usePerformanceMonitor'
 import { useSmartCache } from '../composables/useSmartCache'
-import { diasHastaFecha, formatearFecha, parsearFechaLocal } from '../utils/dates'
+import { formatearFecha, parsearFechaLocal } from '../utils/dates'
 import { useFechaActual } from '../composables/useFechaActual'
 import ClienteIdentificacion from '../components/ClienteIdentificacion.vue'
+import ProximoServicio from '../components/ProximoServicio.vue'
 
 const { fechaActual } = useFechaActual()
 
@@ -342,26 +334,6 @@ const sinDatos = computed(() =>
 const { ordenesVencidas } = useOrdenes()
 const { measureComponentRender, detectExcessiveRerenders } = usePerformanceMonitor()
 const { getOrFetch } = useSmartCache()
-
-const calcularDiasRestantes = (fechaProximoServicio) => {
-  return diasHastaFecha(fechaProximoServicio, fechaActual.value)
-}
-
-const formatearDiasRestantes = (fechaProximoServicio) => {
-  const dias = calcularDiasRestantes(fechaProximoServicio)
-  
-  if (dias === null) return '-'
-  
-  if (dias < 0) {
-    return `${Math.abs(dias)} días vencido`
-  } else if (dias === 0) {
-    return 'Hoy'
-  } else if (dias === 1) {
-    return 'Mañana'
-  } else {
-    return `${dias} días`
-  }
-}
 
 // Medir renders del dashboard
 const checkRerenders = detectExcessiveRerenders('Dashboard', 5)

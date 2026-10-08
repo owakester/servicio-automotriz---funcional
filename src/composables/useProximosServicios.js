@@ -1,11 +1,12 @@
 import { useAutoService } from './useAutoService'
 import { useGoogleDrive } from './useGoogleDrive'
 import { useNotifications } from './useNotifications'
-import { diasHastaFecha, fechaParaInput, formatearFecha, parsearFechaLocal } from '../utils/dates'
+import { diasHastaFecha, fechaParaInput, formatearFecha } from '../utils/dates'
 import { formatearDniCuil } from '../utils/clientIdentity'
+import { ultimosCompletadosPorVehiculo } from '../utils/serviceReminders'
 
 export const useProximosServicios = () => {
-  const { vehiculos, servicios, obtenerClientePorId, obtenerServiciosPorVehiculo } = useAutoService()
+  const { vehiculos, servicios, obtenerClientePorId } = useAutoService()
   const { subirArchivoAGoogleDrive, estaAutenticado } = useGoogleDrive()
   const { success, error } = useNotifications()
 
@@ -13,14 +14,11 @@ export const useProximosServicios = () => {
     const hoy = new Date()
     hoy.setHours(0, 0, 0, 0)
     const proximosServicios = []
+    const ultimosCompletados = ultimosCompletadosPorVehiculo(servicios.value)
 
     vehiculos.value.forEach(vehiculo => {
       const cliente = obtenerClientePorId(vehiculo.clienteId)
-      const serviciosVehiculo = obtenerServiciosPorVehiculo(vehiculo.id)
-      
-      const ultimoServicio = serviciosVehiculo
-        .filter(s => s.estado !== 'cancelado')
-        .sort((a, b) => parsearFechaLocal(b.fechaServicio) - parsearFechaLocal(a.fechaServicio))[0]
+      const ultimoServicio = ultimosCompletados.get(String(vehiculo.id))
 
       if (ultimoServicio && ultimoServicio.proximoServicio) {
         const diasRestantes = diasHastaFecha(ultimoServicio.proximoServicio, hoy)

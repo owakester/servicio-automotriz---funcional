@@ -1,4 +1,5 @@
 import { ref, computed, watch } from 'vue'
+import { ultimosCompletadosPorVehiculo, estadoRecordatorioServicio } from '../utils/serviceReminders'
 import { useNotifications } from './useNotifications'
 import {
   validarDatosAutoservice,
@@ -781,14 +782,14 @@ Todo perfecto! ✨
   }
 
   // Computed para vehículos con alertas de servicio
+  const ultimosCompletados = computed(() => ultimosCompletadosPorVehiculo(servicios.value))
+  const obtenerEstadoRecordatorio = (servicio) => estadoRecordatorioServicio(servicio, ultimosCompletados.value.get(String(servicio.vehiculoId)))
+
   const vehiculosConAlertas = computed(() => {
     const hoy = fechaActual.value
 
     return vehiculos.value.map(vehiculo => {
-      const serviciosVehiculo = obtenerServiciosPorVehiculo(vehiculo.id)
-      const ultimoServicio = serviciosVehiculo
-        .filter(servicio => servicio.estado !== 'cancelado')
-        .sort((a, b) => parsearFechaLocal(b.fechaServicio) - parsearFechaLocal(a.fechaServicio))[0]
+      const ultimoServicio = ultimosCompletados.value.get(String(vehiculo.id))
 
       let alerta = null
       if (ultimoServicio && ultimoServicio.proximoServicio) {
@@ -890,6 +891,7 @@ Todo perfecto! ✨
     actualizarServicio,
     eliminarServicio,
     obtenerServiciosPorVehiculo,
+    obtenerEstadoRecordatorio,
     
     // Funciones de órdenes
     agregarOrden,
