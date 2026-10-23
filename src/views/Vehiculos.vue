@@ -143,7 +143,7 @@
         <div class="mt-4 pt-4 border-t border-gray-200">
           <div v-if="vehiculo.ultimoServicio" class="space-y-2">
             <div class="flex justify-between items-center">
-              <span class="text-sm font-medium text-gray-700">Último servicio:</span>
+              <span class="text-sm font-medium text-gray-700">{{ vehiculo.ultimoServicio.proximoServicio ? 'Servicio con próximo recordatorio:' : 'Último servicio completado:' }}</span>
               <span class="text-sm text-gray-600">
                 {{ formatearFecha(vehiculo.ultimoServicio.fechaServicio) }}
               </span>

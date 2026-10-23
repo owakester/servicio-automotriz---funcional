@@ -36,7 +36,7 @@
               <div>
                 <p class="font-semibold text-gray-900">{{ vehiculo.patente }} · {{ vehiculo.marca }} {{ vehiculo.modelo }}</p>
                 <ClienteIdentificacion :cliente="vehiculo.cliente" class="text-sm text-gray-700" />
-                <p class="mt-1 text-sm text-gray-600">Próximo servicio: {{ formatearFecha(vehiculo.ultimoServicio.proximoServicio) }}</p>
+                <p class="mt-1 text-sm text-gray-600">{{ vehiculo.ultimoServicio.tipoServicio }} · Próximo servicio: {{ formatearFecha(vehiculo.ultimoServicio.proximoServicio) }}</p>
               </div>
               <span :class="['text-sm font-medium', vehiculo.diasRestantes < 0 ? 'text-red-700' : 'text-orange-700']">
                 {{ textoVencimiento(vehiculo.diasRestantes) }}

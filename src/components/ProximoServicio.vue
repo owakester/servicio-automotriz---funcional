@@ -25,7 +25,7 @@ const dias = computed(() => diasHastaFecha(props.servicio.proximoServicio, fecha
 const color = computed(() => dias.value < 0 ? 'bg-red-100 text-red-900' : dias.value <= 7 ? 'bg-orange-100 text-orange-900' : dias.value <= 30 ? 'bg-yellow-100 text-yellow-900' : 'bg-green-100 text-green-900')
 const textoDias = computed(() => dias.value < 0 ? `${Math.abs(dias.value)} días vencido` : dias.value === 0 ? 'Hoy' : dias.value === 1 ? 'Mañana' : `${dias.value} días`)
 const etiquetas = {
-  reemplazado: 'Recordatorio reemplazado por un mantenimiento posterior',
+  reemplazado: 'Recordatorio reemplazado por un servicio posterior del mismo tipo',
   pendiente: 'Se activa al completar el servicio',
   cancelado: 'Sin recordatorio (cancelado)',
   invalido: 'Fecha inválida',

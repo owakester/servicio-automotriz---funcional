@@ -1,5 +1,5 @@
 import { ref, computed, watch } from 'vue'
-import { ultimosCompletadosPorVehiculo, estadoRecordatorioServicio } from '../utils/serviceReminders'
+import { ultimosCompletadosPorVehiculo, ultimosCompletadosPorTipo, claveRecordatorioServicio, estadoRecordatorioServicio } from '../utils/serviceReminders'
 import { useNotifications } from './useNotifications'
 import {
   validarDatosAutoservice,
@@ -783,7 +783,8 @@ Todo perfecto! ✨
 
   // Computed para vehículos con alertas de servicio
   const ultimosCompletados = computed(() => ultimosCompletadosPorVehiculo(servicios.value))
-  const obtenerEstadoRecordatorio = (servicio) => estadoRecordatorioServicio(servicio, ultimosCompletados.value.get(String(servicio.vehiculoId)))
+  const ultimosPorTipo = computed(() => ultimosCompletadosPorTipo(servicios.value))
+  const obtenerEstadoRecordatorio = (servicio) => estadoRecordatorioServicio(servicio, ultimosPorTipo.value.get(claveRecordatorioServicio(servicio)))
 
   const vehiculosConAlertas = computed(() => {
     const hoy = fechaActual.value

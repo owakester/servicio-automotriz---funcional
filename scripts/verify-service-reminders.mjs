@@ -197,6 +197,39 @@ try {
     assert.equal(data.vehiculosConAlertas.value[0].ultimoServicio, undefined)
     assert.equal(reminders.recordatorios.value.length, 0)
   })
+  await check('reparar frenos no reemplaza el mantenimiento general vencido del caso reportado', async () => {
+    const maintenance = { id: 101, vehiculoId: 1, clienteId: 1, tipoServicio: 'Mantenimiento general', fechaServicio: '2025-10-20', proximoServicio: '2026-10-20', estado: 'completado' }
+    const brakes = { id: 102, vehiculoId: 1, clienteId: 1, tipoServicio: 'Reparación de frenos', fechaServicio: '2026-05-22', proximoServicio: null, estado: 'completado' }
+    data.reemplazarDatos({ clientes: [{ id: 1, nombre: 'Cliente QA' }], vehiculos: [{ id: 1, clienteId: 1, marca: 'Mercedes', modelo: 'GLC300', patente: 'AB433JY' }], servicios: [maintenance, brakes], ordenes: [] })
+    mod.useFechaActual().fechaActual.value = '2026-10-23'
+    assert.equal(data.obtenerEstadoRecordatorio(maintenance), 'vigente')
+    assert.equal(data.obtenerEstadoRecordatorio(brakes), 'sin_fecha')
+    assert.equal(data.vehiculosConAlertas.value[0].ultimoServicio.id, 101)
+    assert.deepEqual(data.vehiculosConAlertas.value[0].alerta, { tipo: 'vencido', dias: 3 })
+    assert.equal(reminders.recordatorios.value.length, 1)
+    assert.equal(reminders.recordatorios.value[0].diasRestantes, -3)
+    // Incluso si frenos tiene su propia fecha, no cancela el aviso de mantenimiento.
+    data.actualizarServicio(102, { proximoServicio: '2027-05-22' })
+    assert.equal(data.obtenerEstadoRecordatorio(data.servicios.value[1]), 'vigente')
+    assert.equal(data.obtenerEstadoRecordatorio(maintenance), 'vigente')
+    assert.equal(data.vehiculosConAlertas.value[0].ultimoServicio.id, 101)
+    // Un nuevo mantenimiento todavía en progreso tampoco lo reemplaza.
+    const newer = data.agregarServicio({ ...maintenance, id: 103, fechaServicio: '2026-10-23', proximoServicio: '2027-10-23', estado: 'en_progreso' })
+    assert.ok(newer)
+    assert.equal(data.obtenerEstadoRecordatorio(maintenance), 'vigente')
+    data.actualizarServicio(newer.id, { estado: 'completado' })
+    assert.equal(data.obtenerEstadoRecordatorio(maintenance), 'reemplazado')
+    assert.equal(data.obtenerEstadoRecordatorio(data.servicios.value.find(s => s.id === newer.id)), 'vigente')
+    assert.equal(data.obtenerEstadoRecordatorio(data.servicios.value[1]), 'vigente')
+    assert.equal(reminders.recordatorios.value.length, 0)
+    // Ahora frenos es el vencimiento vigente más cercano, aunque no sea el trabajo más reciente.
+    assert.equal(data.vehiculosConAlertas.value[0].ultimoServicio.id, 102)
+    data.actualizarServicio(newer.id, { estado: 'cancelado' })
+    assert.equal(data.obtenerEstadoRecordatorio(maintenance), 'vigente')
+    assert.equal(reminders.recordatorios.value[0].diasRestantes, -3)
+    assert.equal(data.servicios.value.length, 3)
+    assert.equal(data.servicios.value[0].proximoServicio, '2026-10-20')
+  })
   console.log(`${checks}/${checks} pruebas de recordatorios superadas`)
 } catch (error) {
   console.error(`${error.name}: ${error.message}`)

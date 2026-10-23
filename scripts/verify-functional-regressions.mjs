@@ -400,6 +400,37 @@ try {
     } finally { app.reemplazarDatos(before) }
   })
 
+  await check('frenos y mantenimiento conservan sus recordatorios separados en historial, alertas y reporte', async () => {
+    const before = JSON.parse(JSON.stringify(current(app)))
+    try {
+      const maintenance = { ...service, id: 311, tipoServicio: 'Mantenimiento general', fechaServicio: '2025-10-20', proximoServicio: '2026-10-20', estado: 'completado' }
+      const brakes = { ...service, id: 312, tipoServicio: 'Reparación de frenos', fechaServicio: '2026-05-22', proximoServicio: null, estado: 'completado' }
+      app.reemplazarDatos({ clientes: [client], vehiculos: [car], servicios: [maintenance, brakes], ordenes: [] })
+      mod.useFechaActual().fechaActual.value = '2026-10-23'
+      const report = mod.useProximosServicios()
+      const badge = (s) => mod.renderToString(mod.createSSRApp({ render: () => mod.h(mod.ProximoServicio, { servicio: s, campo: 'dias' }) }))
+      assert.match(await badge(maintenance), /3 días vencido/)
+      assert.doesNotMatch(await badge(maintenance), /reemplazado/)
+      assert.equal(report.obtenerDatosProximosServicios().length, 1)
+      assert.equal(report.obtenerDatosProximosServicios()[0].ultimo_servicio_tipo, 'Mantenimiento general')
+      app.actualizarServicio(312, { proximoServicio: '2027-05-22' })
+      const rows = report.obtenerDatosProximosServicios()
+      assert.deepEqual(rows.map(r => r.ultimo_servicio_tipo), ['Mantenimiento general', 'Reparación de frenos'])
+      assert.equal(app.vehiculosConAlertas.value[0].ultimoServicio.id, 311)
+      const newer = app.agregarServicio({ ...maintenance, id: 313, tipoServicio: ' MANTENIMIENTO   GENERAL ', fechaServicio: '2026-10-23', proximoServicio: '2027-10-23', estado: 'completado' })
+      assert.ok(newer)
+      assert.match(await badge(maintenance), /Recordatorio reemplazado/)
+      assert.equal(report.obtenerDatosProximosServicios().length, 2)
+      assert.ok(!report.obtenerDatosProximosServicios().some(r => r.fecha_proximo_servicio === '2026-10-20'))
+      assert.equal(app.obtenerEstadoRecordatorio(app.servicios.value[1]), 'vigente')
+      assert.equal(app.servicios.value[0].proximoServicio, '2026-10-20')
+      // Un nuevo trabajo de frenos sin próxima fecha solo retira el aviso de frenos.
+      app.agregarServicio({ ...brakes, id: 314, fechaServicio: '2026-10-24' })
+      assert.equal(report.obtenerDatosProximosServicios().length, 1)
+      assert.equal(report.obtenerDatosProximosServicios()[0].fecha_proximo_servicio, '2027-10-23')
+    } finally { app.reemplazarDatos(before) }
+  })
+
   await check('correo opcional, selección por cliente y consulta de servicios no alteran datos ni relaciones', async () => {
     const before = JSON.parse(JSON.stringify(current(app)))
     const view = async (component) => {

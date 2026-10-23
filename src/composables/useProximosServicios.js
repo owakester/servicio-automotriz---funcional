@@ -3,7 +3,7 @@ import { useGoogleDrive } from './useGoogleDrive'
 import { useNotifications } from './useNotifications'
 import { diasHastaFecha, fechaParaInput, formatearFecha } from '../utils/dates'
 import { formatearDniCuil } from '../utils/clientIdentity'
-import { ultimosCompletadosPorVehiculo } from '../utils/serviceReminders'
+import { ultimosCompletadosPorTipo } from '../utils/serviceReminders'
 
 export const useProximosServicios = () => {
   const { vehiculos, servicios, obtenerClientePorId } = useAutoService()
@@ -14,15 +14,15 @@ export const useProximosServicios = () => {
     const hoy = new Date()
     hoy.setHours(0, 0, 0, 0)
     const proximosServicios = []
-    const ultimosCompletados = ultimosCompletadosPorVehiculo(servicios.value)
+    const ultimosCompletados = ultimosCompletadosPorTipo(servicios.value)
 
     vehiculos.value.forEach(vehiculo => {
       const cliente = obtenerClientePorId(vehiculo.clienteId)
-      const ultimoServicio = ultimosCompletados.get(String(vehiculo.id))
-
-      if (ultimoServicio && ultimoServicio.proximoServicio) {
+      for (const ultimoServicio of ultimosCompletados.values()) {
+        if (String(ultimoServicio.vehiculoId) !== String(vehiculo.id)) continue
+        if (!ultimoServicio.proximoServicio) continue
         const diasRestantes = diasHastaFecha(ultimoServicio.proximoServicio, hoy)
-        if (diasRestantes === null) return
+        if (diasRestantes === null) continue
         
         let estado = 'Normal'; let prioridad = 'Baja'
         
