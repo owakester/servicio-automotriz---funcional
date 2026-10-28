@@ -69,7 +69,7 @@ En **Reportes**, el «Total de trabajos realizados» suma solamente servicios co
 
 Brabus Service guarda los registros en un archivo SQLite de esta PC, fuera del navegador. Cada cambio confirmado genera también un JSON en la carpeta de datos; se conservan copias recientes y diarias. La ruta aparece en el aviso superior. Estas copias no protegen frente a una rotura del disco: necesitás además Drive u otro dispositivo.
 
-Esperá el aviso **Guardado en disco verificado** antes de cerrar. Si aparece un error, no repitas el alta de inmediato: conservá lo que escribiste y recargá para comprobar si quedó guardada. Si hay otra pestaña abierta o un conflicto de revisión, cerrá las duplicadas y recargá. No borres archivos ni datos del navegador para solucionar un error.
+El estado normal ocupa una línea: **Datos guardados · Drive actualizado**. En **Ver detalles** podés consultar la carpeta y las fechas confirmadas. Si hay un guardado en curso, una advertencia o una copia pendiente, el aviso completo aparece automáticamente; no cierres mientras diga **Guardando**. Si aparece un error, no repitas el alta de inmediato: conservá lo que escribiste y recargá para comprobar si quedó guardada. Si hay otra pestaña abierta o un conflicto de revisión, cerrá las duplicadas y recargá. No borres archivos ni datos del navegador para solucionar un error.
 
 ### Primera apertura después de actualizar
 

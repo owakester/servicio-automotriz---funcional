@@ -10,7 +10,7 @@ El almacenamiento principal ahora es **SQLite**, no el perfil del navegador. Req
 2. Ejecutá `npm install`, después `npm start` (o `npm run dev`), y abrí **http://localhost:5173**.
 3. La primera vez elegí **Migrar estos registros al disco** si aparecen los datos del navegador. Revisá las cantidades. También podés **Importar una copia JSON existente**, incluidos los backups anteriores de Drive. No edites el JSON a mano.
 4. Elegí **empezar sin registros** solamente para una instalación realmente nueva. Si ya existía una base o hay respaldos, no borres archivos para forzar el inicio.
-5. Verificá clientes, vehículos, servicios, órdenes y adjuntos antes de continuar trabajando. El aviso superior debe decir **Guardado en disco verificado**.
+5. Verificá clientes, vehículos, servicios, órdenes y adjuntos antes de continuar trabajando. El aviso superior confirma el guardado en disco. Cuando Drive también está al día se reduce a **Datos guardados · Drive actualizado**, con carpeta y fechas en **Ver detalles**. Los problemas y copias pendientes se muestran completos automáticamente.
 
 En Windows se guarda en `%LOCALAPPDATA%\BrabusService\taller.sqlite`; sus JSON están en `backups` dentro de esa carpeta. La ruta exacta aparece arriba del programa. Los datos quedan **fuera de GitHub y del repositorio**. Para pruebas se puede usar `BRABUS_DATA_DIR` apuntando a una carpeta aislada; no cambiar esta variable en el taller sin trasladar y verificar primero sus datos.
 
