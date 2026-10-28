@@ -147,11 +147,11 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div>
           <h3 class="font-semibold text-gray-900">Protección automática local</h3>
-          <p class="text-sm text-gray-600 mt-1">El programa conserva hasta tres copias dentro del navegador. Si falla el guardado principal, recupera los cambios de la copia local más reciente. Ante una advertencia de guardado, descargá una copia desde Configuración.</p>
+          <p class="text-sm text-gray-600 mt-1">Los registros se guardan en SQLite, en una carpeta de esta PC fuera del navegador. El aviso superior confirma el guardado en disco. Cada cambio confirmado también genera un JSON local. Si aparece un error, conservá el formulario y recargá para comprobar qué quedó guardado antes de repetir el alta. Otra pestaña no puede sobrescribir cambios con una revisión vieja.</p>
         </div>
         <div>
           <h3 class="font-semibold text-gray-900">Copia externa</h3>
-          <p class="text-sm text-gray-600 mt-1">La copia local no protege frente a una pérdida o rotura de la computadora. Conectá Drive o descargá un backup.</p>
+          <p class="text-sm text-gray-600 mt-1">Una copia en la misma PC no protege frente a una rotura del disco. Conectá Drive: los cambios pendientes se intentan respaldar a los 5 minutos mientras el programa esté abierto y la conexión sea válida. Revisá la fecha confirmada; si dice pendiente, la nube todavía no tiene los últimos cambios. También podés descargar un JSON y guardarlo en otro dispositivo.</p>
         </div>
       </div>
       <router-link to="/configuracion" class="btn-primary inline-flex items-center mt-5 print:hidden">
@@ -165,7 +165,7 @@
       <ul class="space-y-3 text-gray-700">
         <li class="flex items-start gap-3"><CheckCircle class="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" aria-hidden="true" /><span><strong>Todos los días:</strong> revisá las órdenes pendientes y actualizá su estado.</span></li>
         <li class="flex items-start gap-3"><CheckCircle class="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" aria-hidden="true" /><span><strong>Al terminar un trabajo:</strong> registrá servicio, costo y kilometraje.</span></li>
-        <li class="flex items-start gap-3"><CheckCircle class="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" aria-hidden="true" /><span><strong>Una vez por semana:</strong> comprobá que exista una copia externa reciente.</span></li>
+        <li class="flex items-start gap-3"><CheckCircle class="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" aria-hidden="true" /><span><strong>Todos los días:</strong> comprobá la fecha de la copia externa y que Drive no figure pendiente.</span></li>
       </ul>
     </section>
 

@@ -450,6 +450,7 @@ export const useGoogleDrive = () => {
 
   const subirBackupCompletoAGoogleDrive = async (datosBackup, nombreArchivo) => {
     try {
+      if (!datosBackup?.datos || !Object.values(datosBackup.datos).some(lista => Array.isArray(lista) && lista.length)) throw new Error('No se permite subir un backup vacío ni rotar las copias buenas por un taller vacío.')
       const ok = await asegurarTokenValido()
       if (!ok) throw new Error('Token de autenticación inválido o expirado. Vuelve a conectar Google Drive.')
       let carpeta = await buscarCarpeta('AutoService - Backups')
@@ -469,8 +470,8 @@ export const useGoogleDrive = () => {
       const contenidoJSON = JSON.stringify(backupCompleto, null, 2)
       const archivo = await subirArchivo(nombreArchivo, contenidoJSON, carpeta.id, 'application/json')
 
-      // Mantener una rotación simple: la copia actual y la inmediatamente anterior.
-      // Esto evita que el Drive del taller acumule cientos de archivos automáticos.
+      // Conservar cambios recientes y una copia por día, sin desplazar todas
+      // las copias buenas de días anteriores por respaldos de la misma jornada.
       try {
         const lista = await window.gapi.client.drive.files.list({
           q: `'${carpeta.id}' in parents and trashed=false and name contains 'backup-autoservice'`,
@@ -478,7 +479,14 @@ export const useGoogleDrive = () => {
           pageSize: 100,
           fields: 'files(id, name, modifiedTime)'
         })
-        const backupsAntiguos = (lista.result.files || []).slice(2)
+        const archivos = (lista.result.files || []).filter(f => /^backup-autoservice-.*\.json$/.test(f.name))
+        const conservar = new Set(archivos.slice(0, 20).map(f => f.id))
+        const dias = new Set()
+        for (const f of archivos) {
+          const dia = String(f.modifiedTime).slice(0, 10)
+          if (!dias.has(dia) && dias.size < 14) { dias.add(dia); conservar.add(f.id) }
+        }
+        const backupsAntiguos = archivos.filter(f => !conservar.has(f.id))
         await Promise.all(
           backupsAntiguos.map((backup) => window.gapi.client.drive.files.delete({ fileId: backup.id }))
         )

@@ -2,6 +2,26 @@
 
 La guía para la persona que utiliza el sistema está disponible en [MANUAL_USUARIO.md](MANUAL_USUARIO.md) y dentro de la aplicación desde la opción **Ayuda**.
 
+## Guardado seguro en disco y migración (octubre de 2026)
+
+El almacenamiento principal ahora es **SQLite**, no el perfil del navegador. Requiere **Node.js 22.13 o superior**. No hay que instalar ni administrar un servidor de bases de datos aparte.
+
+1. Antes de actualizar la PC del taller, descargá un JSON actual y conservá su original. No limpies el navegador: puede contener cambios todavía no respaldados.
+2. Ejecutá `npm install`, después `npm start` (o `npm run dev`), y abrí **http://localhost:5173**.
+3. La primera vez elegí **Migrar estos registros al disco** si aparecen los datos del navegador. Revisá las cantidades. También podés **Importar una copia JSON existente**, incluidos los backups anteriores de Drive. No edites el JSON a mano.
+4. Elegí **empezar sin registros** solamente para una instalación realmente nueva. Si ya existía una base o hay respaldos, no borres archivos para forzar el inicio.
+5. Verificá clientes, vehículos, servicios, órdenes y adjuntos antes de continuar trabajando. El aviso superior debe decir **Guardado en disco verificado**.
+
+En Windows se guarda en `%LOCALAPPDATA%\BrabusService\taller.sqlite`; sus JSON están en `backups` dentro de esa carpeta. La ruta exacta aparece arriba del programa. Los datos quedan **fuera de GitHub y del repositorio**. Para pruebas se puede usar `BRABUS_DATA_DIR` apuntando a una carpeta aislada; no cambiar esta variable en el taller sin trasladar y verificar primero sus datos.
+
+Cada modificación usa una transacción SQLite y una revisión: una pestaña vieja recibe un conflicto y no puede pisar registros nuevos. El mensaje de éxito se emite después de escribir y releer el estado. Se conservan 50 copias JSON recientes más una por día de hasta 30 jornadas. Si falla el JSON adicional, el programa distingue esa advertencia del guardado confirmado en SQLite.
+
+Drive se intenta actualizar también a los 5 minutos de cambios pendientes (programa abierto, conexión y autorización válidas). Se conservan 20 copias recientes y una por día de hasta 14 jornadas. Nunca se sube automáticamente un taller vacío. La nube **no** sustituye el guardado local ni garantiza cambios que todavía figuran pendientes.
+
+`npm test` incluye pruebas reales de SQLite y de la API local con carpetas temporales: migración del formato anterior, reinicio, borrado simulado del navegador, conflictos entre pestañas, fallo de red, verificación y recuperación. No usan credenciales ni datos reales.
+
+Para volver a una versión anterior al cambio, **exportá primero un JSON actualizado desde la versión nueva** y verificalo; esa versión antigua no lee SQLite. No borres la carpeta de datos ni reemplaces la base por una copia vieja para revertir código.
+
 Sistema de gestión integral para talleres automotrices desarrollado con Vue.js 3 y Tailwind CSS.
 
 ## ✨ Características
@@ -54,12 +74,12 @@ Sistema de gestión integral para talleres automotrices desarrollado con Vue.js 
 - **Estilos**: Tailwind CSS 3
 - **Iconos**: Lucide Vue Next
 - **Build Tool**: Vite
-- **Almacenamiento**: LocalStorage con recuperación automática en IndexedDB
+- **Almacenamiento**: SQLite en disco, JSON locales rotativos y respaldo opcional en Drive
 
 ## 🚀 Instalación y Configuración
 
 ### Prerrequisitos
-- Node.js 16+ 
+- Node.js 22.13 o superior
 - npm o yarn
 
 ### Pasos de instalación
@@ -159,9 +179,8 @@ Accede a **Reportes** para:
 En **Configuración** puedes:
 - Exportar backup completo en formato JSON
 - Importar datos desde archivo de backup
-- Ver el estado de las copias locales automáticas (se conservan las últimas 3)
-- Mantener en Google Drive la copia más reciente y la anterior
-- Limpiar todos los datos
+- Ver el estado de guardado en disco y de las copias locales automáticas
+- Mantener en Google Drive copias recientes y diarias
 - Ver estadísticas del sistema
 
 ## 🎨 Características Técnicas
@@ -218,11 +237,11 @@ En **Configuración** puedes:
 
 ## 📝 Notas Importantes
 
-- **Almacenamiento**: Los datos se guardan en LocalStorage y se respaldan automáticamente en IndexedDB
+- **Almacenamiento**: Los datos se confirman en SQLite y tienen JSON locales rotativos. El navegador conserva solo información auxiliar.
 - **Dirección fija**: Usar siempre `http://localhost:5173` con `npm run dev`. Si el puerto está ocupado, Vite se detiene en lugar de cambiarlo y mostrar otro almacenamiento. `npm run preview` usa 4173 solo para verificar la compilación, no para el uso habitual del taller.
 - **Reportes**: Los importes y el resumen del período incluyen únicamente servicios completados y se muestran como «Total de trabajos realizados». No existe un registro de cobros; no deben interpretarse como dinero cobrado. El conteo anual de servicios conserva todos los estados.
-- **Recuperación**: Si LocalStorage falta, está corrupto o conserva una versión anterior tras un fallo de escritura, se restaura la última copia local válida. Las revisiones de guardado evitan que una copia antigua reemplace cambios más recientes o una restauración manual.
-- **Backup externo**: Google Drive conserva las dos copias más recientes cuando está conectado
+- **Recuperación**: Si SQLite no puede leerse, el programa se detiene y solicita recuperación: nunca presenta un taller vacío como si no hubiera pasado nada. Se pueden importar los JSON anteriores, verificando cantidades y relaciones.
+- **Backup externo**: Google Drive conserva copias recientes y diarias cuando está conectado; un aviso pendiente significa que los últimos cambios todavía no tienen respaldo confirmado en la nube.
 - **Navegadores**: Compatible con navegadores modernos (Chrome, Firefox, Safari, Edge)
 - **Datos**: Solo se envían a Google Drive cuando el usuario conecta y habilita esa opción
 

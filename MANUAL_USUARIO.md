@@ -67,15 +67,22 @@ En **Reportes**, el «Total de trabajos realizados» suma solamente servicios co
 
 ## Copias de seguridad
 
-ServiceCar conserva hasta tres copias locales de recuperación. Estas copias ayudan si se daña el almacenamiento principal del navegador, pero no protegen frente a una pérdida o rotura de la computadora.
+Brabus Service guarda los registros en un archivo SQLite de esta PC, fuera del navegador. Cada cambio confirmado genera también un JSON en la carpeta de datos; se conservan copias recientes y diarias. La ruta aparece en el aviso superior. Estas copias no protegen frente a una rotura del disco: necesitás además Drive u otro dispositivo.
 
-Si falla el guardado principal, al volver a abrir el programa se recuperan los cambios de la copia local más reciente. Si aparece una advertencia de guardado, descargá una copia desde Configuración.
+Esperá el aviso **Guardado en disco verificado** antes de cerrar. Si aparece un error, no repitas el alta de inmediato: conservá lo que escribiste y recargá para comprobar si quedó guardada. Si hay otra pestaña abierta o un conflicto de revisión, cerrá las duplicadas y recargá. No borres archivos ni datos del navegador para solucionar un error.
+
+### Primera apertura después de actualizar
+
+1. Conservá el JSON anterior sin modificarlo y no limpies el navegador.
+2. Si el programa encuentra registros del navegador, elegí **Migrar estos registros al disco**, revisando las cantidades. Si tenés un JSON, usá **Importar una copia JSON existente**; sirven los archivos anteriores, incluso los descargados de Drive.
+3. Confirmá que aparecen los clientes, vehículos, servicios y órdenes esperados. Las fechas, documentos y referencias a fotos se conservan.
+4. **Empezar sin registros** es únicamente para una instalación nueva, nunca para recuperar un taller.
 
 Para tener una copia externa:
 
 1. Entrá en **Configuración**.
 2. Conectá Google Drive o presioná **Guardar copia** para descargar un archivo.
-3. Comprobá una vez por semana que la copia externa sea reciente.
+3. Revisá todos los días la fecha de la última copia externa confirmada. Los cambios pendientes se intentan subir a los 5 minutos, con el programa abierto y Drive conectado. Si el aviso dice pendiente, revisá la conexión en Configuración.
 
 En Configuración se muestra la **Cuenta del taller** prevista para Drive. Presioná **Conectar**, iniciá sesión con ese correo y autorizá el acceso. Luego comprobá que **Cuenta conectada** muestre el mismo correo. Si elegís otra cuenta, el programa rechaza la conexión; las copias locales siguen disponibles. Cambiar la cuenta no mueve los archivos que ya estaban en otro Drive.
 
@@ -85,7 +92,7 @@ Para cambiar de computadora, descargá primero un backup. En la nueva computador
 
 - Todos los días: revisá las órdenes pendientes y actualizá sus estados.
 - Al terminar un trabajo: registrá el servicio, costo y kilometraje.
-- Una vez por semana: comprobá que exista una copia externa reciente.
+- Todos los días: comprobá que exista una copia externa reciente y que Drive no figure pendiente.
 
 ## Si algo no funciona
 

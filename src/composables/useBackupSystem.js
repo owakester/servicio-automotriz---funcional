@@ -7,6 +7,7 @@ import { useProximosServicios } from './useProximosServicios'
 import { crearSnapshotRecuperacion, useDataRecovery, validarDatosAutoservice } from './useDataRecovery'
 import { fechaParaInput, formatearFecha } from '../utils/dates'
 import { formatearDniCuil } from '../utils/clientIdentity'
+import { useDiskStorage, usaDisco } from './useDiskStorage'
 
 const leerPreferenciaLocal = (clave, valorPorDefecto = null) => {
   try {
@@ -33,7 +34,7 @@ const intervaloBackup = ref(parseInt(leerPreferenciaLocal('intervaloBackup', '24
 const backupAutomaticoGoogleDrive = ref(leerPreferenciaLocal('backupAutomaticoGoogleDrive', 'true') !== 'false')
 const ultimoBackupGoogleDrive = ref(leerPreferenciaLocal('ultimoBackupGoogleDrive'))
 const backupGoogleDrive = ref(
-  leerPreferenciaLocal('backupGoogleDrive', 'false') === 'true' || Boolean(ultimoBackupGoogleDrive.value)
+  leerPreferenciaLocal('backupGoogleDrive', usaDisco ? 'true' : 'false') === 'true' || Boolean(ultimoBackupGoogleDrive.value)
 )
 const copiaNubePendiente = ref(false)
 const backupsEnLaNube = ref([])
@@ -41,6 +42,8 @@ const backupsEnLaNube = ref([])
 let backupIntervalId = null
 let backupEnCurso = null
 let detenerObservadorBackup = null
+let detenerObservadorCambios = null
+let backupCambioTimer = null
 
 watch(backupAutomatico, (valor) => { guardarPreferenciaLocal('backupAutomatico', valor) })
 watch(intervaloBackup, (valor) => { guardarPreferenciaLocal('intervaloBackup', valor) })
@@ -49,7 +52,8 @@ watch(backupAutomaticoGoogleDrive, (valor) => { guardarPreferenciaLocal('backupA
 
 export const useBackupSystem = () => {
   const { success, error, info, warning } = useNotifications()
-  const { clientes, vehiculos, servicios, ordenes, inicializacionDatos, reemplazarDatos } = useAutoService()
+  const { clientes, vehiculos, servicios, ordenes, datosListos, inicializacionDatos, reemplazarDatos } = useAutoService()
+  const { guardando, revision: revisionDisco } = useDiskStorage()
   const { ultimoSnapshotLocal } = useDataRecovery()
   const { 
     isAuthenticated,
@@ -143,8 +147,11 @@ export const useBackupSystem = () => {
     return datosNormalizados
   }
 
-  const aplicarDatosRestaurados = (datos) => {
-    reemplazarDatos(datos)
+  const aplicarDatosRestaurados = async (datos, confirmEmpty = false) => {
+    await inicializacionDatos
+    await reemplazarDatos(datos, { action: 'restauracion', confirmEmpty })
+    const esperado = JSON.stringify(datos)
+    if (JSON.stringify({ clientes: clientes.value, vehiculos: vehiculos.value, servicios: servicios.value, ordenes: ordenes.value }) !== esperado) throw Error('La verificación de los registros restaurados no coincide. No se informó una restauración exitosa.')
   }
 
   const generarCSVClientes = (clientesData) => {
@@ -309,6 +316,13 @@ export const useBackupSystem = () => {
   
   const crearBackup = async (subirAGoogleDrive = false, opciones = {}) => {
     try {
+      await inicializacionDatos
+      if (!datosListos.value || guardando.value) return false
+      if (![clientes, vehiculos, servicios, ordenes].some(lista => lista.value.length)) {
+        if (opciones.notificar !== false) warning('No se generó un backup vacío. Se conservaron las copias existentes.')
+        return false
+      }
+      const revisionRespaldada = revisionDisco.value
       const datos = {
         version: '1.0', fecha: new Date().toISOString(),
         datos: { clientes: clientes.value, vehiculos: vehiculos.value, servicios: servicios.value, ordenes: ordenes.value },
@@ -323,7 +337,7 @@ export const useBackupSystem = () => {
         descargarBlob(blob, nombreArchivo)
       }
 
-      if (typeof indexedDB !== 'undefined') {
+      if (!usaDisco && typeof indexedDB !== 'undefined') {
         await crearSnapshotRecuperacion(datos.datos, descargar ? 'manual' : 'programado')
       }
       
@@ -333,6 +347,9 @@ export const useBackupSystem = () => {
 
       const debeSubir = subirAGoogleDrive || backupGoogleDrive.value
       if (debeSubir && !estaAutenticado()) {
+        // Los backups programados no deben abrir un flujo de acceso a Google
+        // sin una acción del usuario; se avisa y queda pendiente de conectar.
+        if (!notificar) { copiaNubePendiente.value = true; return false }
         await initializeGoogleDrive()
         const sesionRenovada = await asegurarTokenValido()
         if (!sesionRenovada) {
@@ -343,7 +360,7 @@ export const useBackupSystem = () => {
       }
 
       if (debeSubir) {
-        const resultado = await subirBackupCompletoAGoogleDrive(datos, nombreArchivo)
+        const resultado = await subirBackupCompletoAGoogleDrive(JSON.parse(JSON.stringify(datos)), nombreArchivo)
         if (!resultado.success) {
           copiaNubePendiente.value = true
           if (notificar) warning('La copia local se creó, pero no se pudo subir a Google Drive')
@@ -353,7 +370,7 @@ export const useBackupSystem = () => {
         ultimoBackupGoogleDrive.value = new Date().toISOString()
         guardarPreferenciaLocal('ultimoBackupGoogleDrive', ultimoBackupGoogleDrive.value)
         backupGoogleDrive.value = true
-        copiaNubePendiente.value = false
+        copiaNubePendiente.value = revisionDisco.value !== revisionRespaldada
         mensaje = 'Backup JSON subido a Google Drive'
       }
 
@@ -369,7 +386,7 @@ export const useBackupSystem = () => {
   const restaurarBackup = (archivo) => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader()
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             try {
                 const backup = JSON.parse(e.target.result)
                 const datos = normalizarBackup(backup)
@@ -389,8 +406,10 @@ export const useBackupSystem = () => {
                   return
                 }
 
-                aplicarDatosRestaurados(datos)
-                success('Backup restaurado exitosamente')
+                const vacio = !Object.values(datos).some(lista => lista.length)
+                if (vacio && !confirm('Esta copia contiene CERO registros. ¿Confirmás reemplazar los datos actuales por un taller vacío?')) { resolve(false); return }
+                await aplicarDatosRestaurados(datos, vacio)
+                success(`Restauración verificada: ${datos.clientes.length} clientes, ${datos.vehiculos.length} vehículos, ${datos.servicios.length} servicios y ${datos.ordenes.length} órdenes`)
                 resolve(true)
             } catch (err) {
                 error('Error al restaurar el backup: ' + err.message); reject(err)
@@ -538,8 +557,10 @@ export const useBackupSystem = () => {
 
   const ejecutarBackupAutomatico = () => {
     if (backupEnCurso) return backupEnCurso
+    if (!datosListos.value || guardando.value) return Promise.resolve(false)
 
-    const requiereNube = verificarBackupAutomaticoGoogleDrive()
+    const requiereNube = verificarBackupAutomaticoGoogleDrive() ||
+      (backupAutomaticoGoogleDrive.value && backupGoogleDrive.value && copiaNubePendiente.value)
     const requiereLocal = verificarBackupAutomatico()
     if (!requiereNube && !requiereLocal) return Promise.resolve(false)
 
@@ -554,10 +575,18 @@ export const useBackupSystem = () => {
 
     void ejecutarBackupAutomatico()
     detenerObservadorBackup = watch(
-      [backupAutomatico, backupAutomaticoGoogleDrive, intervaloBackup, isAuthenticated],
+      [backupAutomatico, backupGoogleDrive, backupAutomaticoGoogleDrive, intervaloBackup, isAuthenticated, datosListos],
       () => { void ejecutarBackupAutomatico() },
       { flush: 'post' }
     )
+    detenerObservadorCambios = watch([clientes, vehiculos, servicios, ordenes], () => {
+      if (!datosListos.value || !backupAutomaticoGoogleDrive.value || !backupGoogleDrive.value) return
+      copiaNubePendiente.value = true
+      if (!backupCambioTimer) backupCambioTimer = setTimeout(() => {
+        backupCambioTimer = null
+        if (!backupEnCurso) backupEnCurso = crearBackup(true, { descargar: false, notificar: false }).finally(() => { backupEnCurso = null })
+      }, 5 * 60 * 1000)
+    }, { deep: true, flush: 'post' })
     backupIntervalId = setInterval(() => {
       void ejecutarBackupAutomatico()
     }, 60 * 60 * 1000)
@@ -570,6 +599,10 @@ export const useBackupSystem = () => {
     backupIntervalId = null
     if (detenerObservadorBackup) detenerObservadorBackup()
     detenerObservadorBackup = null
+    if (detenerObservadorCambios) detenerObservadorCambios()
+    detenerObservadorCambios = null
+    if (backupCambioTimer) clearTimeout(backupCambioTimer)
+    backupCambioTimer = null
   }
 
   const cargarBackupsDeGoogleDrive = async () => {
@@ -590,22 +623,20 @@ export const useBackupSystem = () => {
       if (!backup?.id) throw new Error('Backup de Google Drive inválido')
       if (!estaAutenticado()) throw new Error('Debes conectar Google Drive primero')
 
-      const confirmacion = confirm(
-        `¿Restaurar el backup "${backup.nombre}" desde Google Drive?\n\n` +
-        `Esto reemplazará todos los datos actuales.`
-      )
+      const resultado = await descargarBackupDeGoogleDrive(backup.id, backup.nombre, false)
+      if (!resultado.success) throw new Error(resultado.error || 'No se pudo descargar el backup')
+      const contenido = JSON.parse(resultado.contenido)
+      const datos = normalizarBackup(contenido)
+      const confirmacion = confirm(`¿Restaurar "${backup.nombre}" desde Google Drive?\n\nSe reemplazarán los datos por ${datos.clientes.length} clientes, ${datos.vehiculos.length} vehículos, ${datos.servicios.length} servicios y ${datos.ordenes.length} órdenes.`)
       if (!confirmacion) {
         info('Restauración cancelada')
         return false
       }
 
-      const resultado = await descargarBackupDeGoogleDrive(backup.id, backup.nombre, false)
-      if (!resultado.success) throw new Error(resultado.error || 'No se pudo descargar el backup')
-
-      const contenido = JSON.parse(resultado.contenido)
-      const datos = normalizarBackup(contenido)
-      aplicarDatosRestaurados(datos)
-      success('Backup restaurado exitosamente desde Google Drive')
+      const vacio = !Object.values(datos).some(lista => lista.length)
+      if (vacio && !confirm('El archivo de Drive tiene CERO registros. ¿Confirmás reemplazar los datos actuales por un taller vacío?')) return false
+      await aplicarDatosRestaurados(datos, vacio)
+      success(`Drive restaurado y verificado: ${datos.clientes.length} clientes, ${datos.vehiculos.length} vehículos, ${datos.servicios.length} servicios y ${datos.ordenes.length} órdenes`)
       return true
     } catch (err) {
       console.error('Error al restaurar backup de Google Drive:', err)

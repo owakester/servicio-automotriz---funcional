@@ -1,4 +1,5 @@
 import { ref, computed, watch } from 'vue'
+import { usaDisco, iniciarDisco, guardarEnDisco, useDiskStorage } from './useDiskStorage'
 import { ultimosCompletadosPorVehiculo, ultimosCompletadosPorTipo, claveRecordatorioServicio, estadoRecordatorioServicio } from '../utils/serviceReminders'
 import { useNotifications } from './useNotifications'
 import {
@@ -196,6 +197,22 @@ const inicializarDatos = () => {
   if (inicializacionIniciada) return inicializacionDatos
   inicializacionIniciada = true
 
+  if (usaDisco) {
+    inicializacionDatos = iniciarDisco().then(async (resultado) => {
+      if (resultado.initialized) {
+        aplicarDatosAlEstado(resultado.datos)
+        datosListos.value = true
+        return { recuperado: false, disco: true }
+      }
+      const locales = leerDatosLocales()
+      const snapshot = await obtenerUltimoSnapshotValido()
+      const candidato = locales.estado === 'valido' && (!snapshot || leerRevisionDatosLocales() >= Number(snapshot.revision || 0)) ? locales.datos : snapshot?.datos
+      if (candidato && validarDatosAutoservice(candidato) && Object.values(candidato).some(a => a.length)) useDiskStorage().candidatoMigracion.value = candidato
+      return { recuperado: false, requiereMigracion: true }
+    }).catch(() => ({ recuperado: false, error: true }))
+    return inicializacionDatos
+  }
+
   const datosLocales = leerDatosLocales()
   const revisionLocal = leerRevisionDatosLocales()
   registrarRevisionDatos(revisionLocal)
@@ -278,8 +295,15 @@ const inicializarDatos = () => {
 
 // La restauración también debe actualizar la revisión: una copia anterior no
 // puede ganar frente a una restauración explícita más reciente.
-const reemplazarDatos = (datos) => {
+const reemplazarDatos = (datos, opciones = {}) => {
   if (!validarDatosAutoservice(datos)) throw new Error('Los datos no tienen relaciones válidas')
+  if (usaDisco) return guardarEnDisco(JSON.parse(JSON.stringify(datos)), { action: 'restauracion', ...opciones }).then(resultado => {
+    aplicarDatosAlEstado(resultado.datos)
+    datosListos.value = true
+    // Solo caché de compatibilidad. SQLite sigue siendo el origen principal.
+    try { guardarDatosEnLocalStorage(resultado.datos) } catch { /* El disco ya confirmó el guardado. */ }
+    return true
+  })
   const revision = crearRevisionDatos()
   guardarDatosEnLocalStorage(datos, revision)
   aplicarDatosAlEstado(datos)
@@ -289,6 +313,26 @@ const reemplazarDatos = (datos) => {
 export const useAutoService = () => {
   const { success, error, warning } = useNotifications()
   const { fechaActual } = useFechaActual()
+
+  // Preparar un estado nuevo y publicarlo únicamente después del COMMIT y su
+  // lectura de verificación. Los formularios esperan esta promesa.
+  const confirmarCambio = (coleccion, lista, resultado, mensaje) => {
+    const datos = JSON.parse(JSON.stringify({ ...obtenerDatosActuales(), [coleccion]: lista }))
+    if (!usaDisco) {
+      aplicarDatosAlEstado(datos)
+      success(mensaje)
+      return resultado
+    }
+    return guardarEnDisco(datos).then(guardado => {
+      aplicarDatosAlEstado(guardado.datos)
+      try { guardarDatosEnLocalStorage(guardado.datos) } catch { /* No es el guardado principal. */ }
+      success(mensaje)
+      return resultado
+    }).catch(err => {
+      error(`No se confirmó el guardado: ${err.message}`, { persistent: true })
+      return null
+    })
+  }
   
   // Cargar una sola vez y recuperar la última copia local si fuera necesario.
   const eraPrimeraInicializacion = !inicializacionIniciada
@@ -296,7 +340,7 @@ export const useAutoService = () => {
   if (eraPrimeraInicializacion) {
     void carga.then((resultado) => {
       if (resultado.recuperado) success('Datos recuperados automáticamente desde la última copia local')
-      else if (resultado.error) warning('No se encontró una copia local válida para recuperar')
+      else if (resultado.error) warning(usaDisco ? 'No se pudo leer el almacenamiento en disco. Conservá la carpeta de datos; no se inició un taller vacío.' : 'No se encontró una copia local válida para recuperar')
     })
   }
 
@@ -501,9 +545,7 @@ Todo perfecto! ✨
       telefono: limpiarTelefono(cliente.telefono || ''),
       fechaCreacion: new Date().toISOString()
     }
-    clientes.value.push(nuevoCliente)
-    success(`Cliente ${cliente.nombre} agregado exitosamente`)
-    return nuevoCliente
+    return confirmarCambio('clientes', [...clientes.value, nuevoCliente], nuevoCliente, `Cliente ${cliente.nombre} guardado`)
   }
 
   // Función para actualizar cliente (MEJORADA CON WHATSAPP)
@@ -530,9 +572,7 @@ Todo perfecto! ✨
         dniCuil: normalizarDniCuil(clienteCombinado.dniCuil),
         telefono: limpiarTelefono(clienteCombinado.telefono || '')
       }
-      clientes.value[index] = { ...clientes.value[index], ...datosActualizados }
-      success(`Cliente ${clienteActualizado.nombre} actualizado exitosamente`)
-      return clientes.value[index]
+      return confirmarCambio('clientes', clientes.value.map((c, i) => i === index ? datosActualizados : c), datosActualizados, `Cliente ${clienteActualizado.nombre} actualizado`)
     }
     error('Cliente no encontrado')
     return null
@@ -551,9 +591,7 @@ Todo perfecto! ✨
     const index = clientes.value.findIndex(c => idsIguales(c.id, id))
     if (index !== -1) {
       const cliente = clientes.value[index]
-      clientes.value.splice(index, 1)
-      success(`Cliente ${cliente.nombre} eliminado exitosamente`)
-      return true
+      return confirmarCambio('clientes', clientes.value.filter((_, i) => i !== index), true, `Cliente ${cliente.nombre} eliminado`)
     }
     error('Cliente no encontrado')
     return false
@@ -585,9 +623,7 @@ Todo perfecto! ✨
       patente,
       fechaCreacion: new Date().toISOString()
     }
-    vehiculos.value.push(nuevoVehiculo)
-    success(`Vehículo ${vehiculo.marca} ${vehiculo.modelo} agregado exitosamente`)
-    return nuevoVehiculo
+    return confirmarCambio('vehiculos', [...vehiculos.value, nuevoVehiculo], nuevoVehiculo, `Vehículo ${vehiculo.marca} ${vehiculo.modelo} guardado`)
   }
 
   // Función para actualizar vehículo
@@ -616,9 +652,8 @@ Todo perfecto! ✨
         error('El cliente seleccionado no existe')
         return null
       }
-      vehiculos.value[index] = { ...vehiculoCombinado, patente, clienteId: vehiculos.value[index].clienteId }
-      success(`Vehículo ${vehiculoActualizado.marca} ${vehiculoActualizado.modelo} actualizado exitosamente`)
-      return vehiculos.value[index]
+      const actualizado = { ...vehiculoCombinado, patente, clienteId: vehiculos.value[index].clienteId }
+      return confirmarCambio('vehiculos', vehiculos.value.map((v, i) => i === index ? actualizado : v), actualizado, `Vehículo ${vehiculoActualizado.marca} ${vehiculoActualizado.modelo} actualizado`)
     }
     error('Vehículo no encontrado')
     return null
@@ -636,9 +671,7 @@ Todo perfecto! ✨
     const index = vehiculos.value.findIndex(v => idsIguales(v.id, id))
     if (index !== -1) {
       const vehiculo = vehiculos.value[index]
-      vehiculos.value.splice(index, 1)
-      success(`Vehículo ${vehiculo.marca} ${vehiculo.modelo} eliminado exitosamente`)
-      return true
+      return confirmarCambio('vehiculos', vehiculos.value.filter((_, i) => i !== index), true, `Vehículo ${vehiculo.marca} ${vehiculo.modelo} eliminado`)
     }
     error('Vehículo no encontrado')
     return false
@@ -662,9 +695,7 @@ Todo perfecto! ✨
       ...servicio,
       fechaCreacion: new Date().toISOString()
     }
-    servicios.value.push(nuevoServicio)
-    success(`Servicio ${servicio.tipoServicio} agregado exitosamente`)
-    return nuevoServicio
+    return confirmarCambio('servicios', [...servicios.value, nuevoServicio], nuevoServicio, `Servicio ${servicio.tipoServicio} guardado`)
   }
 
   // Función para actualizar servicio
@@ -684,9 +715,8 @@ Todo perfecto! ✨
         error('Revisa el tipo, la fecha y el costo del servicio')
         return null
       }
-      servicios.value[index] = { ...servicioCombinado, fechaCreacion: servicios.value[index].fechaCreacion }
-      success(`Servicio ${servicioActualizado.tipoServicio} actualizado exitosamente`)
-      return servicios.value[index]
+      const actualizado = { ...servicioCombinado, fechaCreacion: servicios.value[index].fechaCreacion }
+      return confirmarCambio('servicios', servicios.value.map((s, i) => i === index ? actualizado : s), actualizado, `Servicio ${servicioActualizado.tipoServicio} actualizado`)
     }
     error('Servicio no encontrado')
     return null
@@ -697,9 +727,7 @@ Todo perfecto! ✨
     const index = servicios.value.findIndex(s => idsIguales(s.id, id))
     if (index !== -1) {
       const servicio = servicios.value[index]
-      servicios.value.splice(index, 1)
-      success(`Servicio eliminado exitosamente`)
-      return true
+      return confirmarCambio('servicios', servicios.value.filter((_, i) => i !== index), true, 'Servicio eliminado')
     }
     error('Servicio no encontrado')
     return false
@@ -733,9 +761,7 @@ Todo perfecto! ✨
       ...orden,
       fechaCreacion: new Date().toISOString()
     }
-    ordenes.value.push(nuevaOrden)
-    success(`Orden agregada exitosamente`)
-    return nuevaOrden
+    return confirmarCambio('ordenes', [...ordenes.value, nuevaOrden], nuevaOrden, 'Orden guardada')
   }
 
   // Función para actualizar orden
@@ -755,9 +781,7 @@ Todo perfecto! ✨
         error('La orden necesita una descripción y un presupuesto válido')
         return null
       }
-      ordenes.value[index] = ordenCombinada
-      success(`Orden actualizada exitosamente`)
-      return ordenes.value[index]
+      return confirmarCambio('ordenes', ordenes.value.map((o, i) => i === index ? ordenCombinada : o), ordenCombinada, 'Orden actualizada')
     }
     error('Orden no encontrada')
     return null
@@ -768,9 +792,7 @@ Todo perfecto! ✨
     const index = ordenes.value.findIndex(o => idsIguales(o.id, id))
     if (index !== -1) {
       const orden = ordenes.value[index]
-      ordenes.value.splice(index, 1)
-      success(`Orden eliminada exitosamente`)
-      return true
+      return confirmarCambio('ordenes', ordenes.value.filter((_, i) => i !== index), true, 'Orden eliminada')
     }
     error('Orden no encontrada')
     return false

@@ -820,7 +820,7 @@ const editarServicio = (servicio) => {
   mostrarFormulario.value = true
 }
 
-const guardarServicio = () => {
+const guardarServicio = async () => {
   const datosServicio = {
     ...formulario.value,
     vehiculoId: parseInt(formulario.value.vehiculoId),
@@ -832,8 +832,8 @@ const guardarServicio = () => {
   }
 
   const resultado = servicioEditando.value
-    ? actualizarServicio(servicioEditando.value.id, datosServicio)
-    : agregarServicio(datosServicio)
+    ? await actualizarServicio(servicioEditando.value.id, datosServicio)
+    : await agregarServicio(datosServicio)
   if (resultado) cancelarFormulario()
 }
 
@@ -848,8 +848,8 @@ const eliminarServicioConfirm = (servicioId) => {
   mostrarConfirmacion.value = true
 }
 
-const confirmarEliminarServicio = () => {
-  if (servicioAEliminar.value !== null) eliminarServicio(servicioAEliminar.value)
+const confirmarEliminarServicio = async () => {
+  if (servicioAEliminar.value !== null && !await eliminarServicio(servicioAEliminar.value)) return
   cancelarEliminarServicio()
 }
 

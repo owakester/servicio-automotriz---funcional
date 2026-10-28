@@ -613,7 +613,7 @@ const editarOrden = (orden) => {
   mostrarFormulario.value = true
 }
 
-const guardarOrden = () => {
+const guardarOrden = async () => {
   // El cliente siempre pertenece al vehículo; el selector solo facilita encontrarlo.
   const vehiculo = obtenerVehiculoPorId(Number(formulario.value.vehiculoId))
   if (!vehiculo || !obtenerClientePorId(vehiculo.clienteId)) {
@@ -635,8 +635,8 @@ const guardarOrden = () => {
   }
 
   const resultado = ordenEditando.value
-    ? actualizarOrden(ordenEditando.value.id, datosOrden)
-    : crearOrden(datosOrden)
+    ? await actualizarOrden(ordenEditando.value.id, datosOrden)
+    : await crearOrden(datosOrden)
   if (resultado) cancelarFormulario()
 }
 
@@ -658,9 +658,9 @@ const eliminarOrdenConfirm = (ordenId) => {
   mostrarConfirmacion.value = true
 }
 
-const confirmarAccion = () => {
+const confirmarAccion = async () => {
   if (confirmacion.value.accion) {
-    confirmacion.value.accion()
+    if (!await confirmacion.value.accion()) return
   }
   cancelarAccion()
 }
@@ -744,7 +744,7 @@ const generarYSubirPDF = async (orden) => {
         
         if (resultado.success) {
           // Actualizar orden con enlace de Google Drive
-          actualizarOrden(orden.id, {
+          await actualizarOrden(orden.id, {
             googleDriveFileId: resultado.fileId,
             googleDriveLink: resultado.webViewLink
           })
@@ -760,15 +760,15 @@ const generarYSubirPDF = async (orden) => {
 }
 
 // Funciones para manejo de imágenes
-const handleImagenSubida = (imagen) => {
+const handleImagenSubida = async (imagen) => {
   if (ordenEditando.value) {
-    agregarImagenAOrden(ordenEditando.value.id, imagen)
+    await agregarImagenAOrden(ordenEditando.value.id, imagen)
   }
 }
 
-const handleImagenEliminada = (imagen) => {
+const handleImagenEliminada = async (imagen) => {
   if (ordenEditando.value) {
-    eliminarImagenDeOrden(ordenEditando.value.id, imagen.fileId)
+    await eliminarImagenDeOrden(ordenEditando.value.id, imagen.fileId)
   }
 }
 

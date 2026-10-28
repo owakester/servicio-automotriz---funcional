@@ -37,6 +37,12 @@ credentials.json
 *.db
 *.sqlite
 *.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.db-wal
+*.db-shm
+backups/
+datos-taller/
 
 # Backups
 backup/

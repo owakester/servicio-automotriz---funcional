@@ -548,7 +548,7 @@ const editarVehiculo = (vehiculo) => {
   mostrarFormulario.value = true
 }
 
-const guardarVehiculo = () => {
+const guardarVehiculo = async () => {
   const datosVehiculo = {
     ...formulario.value,
     patente: formulario.value.patente.toUpperCase(),
@@ -558,8 +558,8 @@ const guardarVehiculo = () => {
   }
 
   const resultado = vehiculoEditando.value
-    ? actualizarVehiculo(vehiculoEditando.value.id, datosVehiculo)
-    : agregarVehiculo(datosVehiculo)
+    ? await actualizarVehiculo(vehiculoEditando.value.id, datosVehiculo)
+    : await agregarVehiculo(datosVehiculo)
   if (resultado) cancelarFormulario()
 }
 
@@ -582,8 +582,8 @@ const eliminarVehiculoConfirm = (vehiculoId) => {
   mostrarConfirmacion.value = true
 }
 
-const confirmarEliminarVehiculo = () => {
-  if (vehiculoAEliminar.value) eliminarVehiculo(vehiculoAEliminar.value.id)
+const confirmarEliminarVehiculo = async () => {
+  if (vehiculoAEliminar.value && !await eliminarVehiculo(vehiculoAEliminar.value.id)) return
   cancelarEliminarVehiculo()
 }
 

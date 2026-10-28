@@ -33,8 +33,9 @@
 
     <!-- Main Content -->
     <main class="max-w-7xl mx-auto py-6 px-4">
+      <EstadoDisco />
       <router-view v-if="datosListos" />
-      <p v-else role="status" class="text-gray-600">Cargando datos del taller…</p>
+      <p v-else-if="!usaDisco || estadoDisco === 'conectando'" role="status" class="text-gray-600">Cargando datos del taller…</p>
     </main>
     
     <!-- Notifications -->
@@ -53,10 +54,13 @@ import { Car, BarChart3, Users, Wrench, FileText, Settings, ClipboardList, HelpC
 import NotificationContainer from './components/NotificationContainer.vue'
 import WhatsAppFloatingButton from './components/WhatsAppFloatingButton.vue'
 import RecordatoriosServicios from './components/RecordatoriosServicios.vue'
+import EstadoDisco from './components/EstadoDisco.vue'
+import { usaDisco, useDiskStorage } from './composables/useDiskStorage'
 import { useAutoService } from './composables/useAutoService'
 import { iniciarRelojCalendario, detenerRelojCalendario } from './composables/useFechaActual'
 
 const { datosListos } = useAutoService()
+const { estado: estadoDisco } = useDiskStorage()
 
 // Iniciar backup automático
 const startBackup = inject('startBackup')

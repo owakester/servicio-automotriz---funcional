@@ -142,6 +142,7 @@ export const useOrdenes = () => {
       const nuevasImagenes = [...imagenesActuales, imagen]
       
       const ordenActualizada = actualizarOrdenService(idOrden, { imagenes: nuevasImagenes })
+      if (ordenActualizada?.then) return ordenActualizada.then(resultado => { if (resultado) success('Imagen guardada en la orden'); return resultado })
       if (ordenActualizada) {
         success('Imagen agregada a la orden')
       }
@@ -158,6 +159,7 @@ export const useOrdenes = () => {
       const imagenesActualizadas = orden.imagenes.filter(img => img.fileId !== idImagen)
       
       const ordenActualizada = actualizarOrdenService(idOrden, { imagenes: imagenesActualizadas })
+      if (ordenActualizada?.then) return ordenActualizada.then(resultado => { if (resultado) success('Imagen eliminada de la orden'); return resultado })
       if (ordenActualizada) {
         success('Imagen eliminada de la orden')
       }

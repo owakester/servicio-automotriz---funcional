@@ -51,7 +51,7 @@
             <div>
               <h3 class="text-lg font-medium text-gray-900">Protección Local Automática</h3>
               <p class="text-sm text-gray-600">
-                Se guardan silenciosamente las últimas 3 copias cada vez que cambian los datos.
+                El guardado principal está en disco (SQLite). Cada cambio confirmado genera además un JSON local; se conservan cambios recientes y copias diarias. El navegador ya no es el almacenamiento principal.
               </p>
               <p
                 class="text-sm mt-2"
@@ -117,7 +117,7 @@
               <option :value="48">Cada 2 días</option>
               <option :value="168">Una vez por semana</option>
             </select>
-            <p class="text-xs text-gray-500 mt-2">Drive conserva solamente la copia más reciente y la anterior.</p>
+            <p class="text-xs text-gray-500 mt-2">Los cambios pendientes también se intentan respaldar a los 5 minutos, mientras el programa esté abierto y Drive conectado. Se conservan copias recientes y una por día de hasta 14 días. El guardado principal está en SQLite, fuera del navegador.</p>
           </div>
         </div>
         
@@ -127,7 +127,7 @@
             <!-- Último backup local -->
             <div>
               <div class="flex items-center justify-between mb-2">
-                <p class="text-sm font-medium text-gray-700">Última copia local</p>
+                <p class="text-sm font-medium text-gray-700">{{ usaDisco ? 'Último guardado en disco' : 'Última copia local' }}</p>
 <button
   @click="crearBackupLocalAhora"
   :disabled="subiendoLocal"
@@ -139,7 +139,7 @@
 
               </div>
               <p class="text-sm text-gray-600">
-                {{ ultimoSnapshotLocal ? new Date(ultimoSnapshotLocal).toLocaleString('es-AR') : 'Preparando primera copia...' }}
+                {{ fechaCopiaLocal ? new Date(fechaCopiaLocal).toLocaleString('es-AR') : 'Todavía no hay una copia confirmada' }}
               </p>
             </div>
             
@@ -362,8 +362,8 @@
         </div>
         <div class="pt-4 border-t">
           <p class="text-sm text-gray-600">
-            Esta aplicación guarda los datos en este navegador y conserva tres copias locales de recuperación.
-            Para protegerte ante una falla de la computadora, mantén también conectado Google Drive.
+            Esta aplicación guarda los registros en SQLite y conserva copias JSON locales fuera del navegador.
+            Para protegerte ante una falla del disco, mantené también conectado Google Drive y revisá la fecha de la última copia confirmada.
           </p>
         </div>
       </div>
@@ -375,6 +375,7 @@
 import { ref, computed } from 'vue'
 import { Database, Upload, Cloud, RefreshCw, Eye, X, AlertTriangle } from 'lucide-vue-next'
 import { useBackupSystem } from '../composables/useBackupSystem'
+import { useDiskStorage, usaDisco } from '../composables/useDiskStorage'
 import { useAutoService } from '../composables/useAutoService'
 import { useNotifications } from '../composables/useNotifications'
 import { useGoogleDrive } from '../composables/useGoogleDrive'
@@ -429,7 +430,10 @@ const conectarGoogleDrive = async () => {
 
 const { success, info: showInfo, error: showError } = useNotifications()
 const { clientes, vehiculos, servicios, ordenes } = useAutoService()
-const { estadoRecuperacion, mensajeRecuperacion } = useDataRecovery()
+const { estadoRecuperacion: estadoLocalAnterior, mensajeRecuperacion: mensajeLocalAnterior } = useDataRecovery()
+const { estado: estadoDisco, mensaje: mensajeDisco, ultimaConfirmacion } = useDiskStorage()
+const estadoRecuperacion = computed(() => usaDisco ? (estadoDisco.value === 'listo' ? 'protegido' : 'advertencia') : estadoLocalAnterior.value)
+const mensajeRecuperacion = computed(() => usaDisco ? mensajeDisco.value : mensajeLocalAnterior.value)
 const {
   ultimoSnapshotLocal,
   intervaloBackup,
@@ -446,6 +450,7 @@ const {
   restaurarBackupDeGoogleDrive,
   eliminarBackupDeGoogleDrive
 } = useBackupSystem()
+const fechaCopiaLocal = computed(() => usaDisco ? ultimaConfirmacion.value : ultimoSnapshotLocal.value)
 
 // 🆕 GOOGLE DRIVE
 const { estaAutenticado, initializeGoogleDrive, authenticateUser, cuentaGoogleDrive, correoGoogleDriveConfigurado } = useGoogleDrive()

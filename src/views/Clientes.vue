@@ -426,7 +426,7 @@ const editarCliente = (cliente) => {
   mostrarFormulario.value = true
 }
 
-const guardarCliente = () => {
+const guardarCliente = async () => {
   // Validar formulario
   clearErrors()
   const esValido = [
@@ -440,8 +440,8 @@ const guardarCliente = () => {
   if (!esValido) return
 
   const resultado = clienteEditando.value
-    ? actualizarCliente(clienteEditando.value.id, formulario.value)
-    : agregarCliente(formulario.value)
+    ? await actualizarCliente(clienteEditando.value.id, formulario.value)
+    : await agregarCliente(formulario.value)
   if (resultado) cancelarFormulario()
 }
 
@@ -464,9 +464,9 @@ const eliminarClienteConfirm = (clienteId) => {
   mostrarConfirmacion.value = true
 }
 
-const confirmarEliminarCliente = () => {
+const confirmarEliminarCliente = async () => {
   if (clienteAEliminar.value) {
-    eliminarCliente(clienteAEliminar.value.id)
+    if (!await eliminarCliente(clienteAEliminar.value.id)) return
   }
   cancelarEliminarCliente()
 }
