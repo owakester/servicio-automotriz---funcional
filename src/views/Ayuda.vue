@@ -89,6 +89,9 @@
           <li>Podés buscar al cliente por nombre o DNI/CUIL y elegir uno de sus vehículos. Si tiene uno solo, se selecciona automáticamente. También podés elegir directamente el vehículo; su cliente se completa automáticamente.</li>
           <li>Describí claramente el trabajo solicitado.</li>
           <li>Actualizá el estado: Pendiente, En proceso o Completada.</li>
+          <li>Para consultar Servicios y volver sin perder lo escrito, elegí <strong>Continuar después</strong> y luego <strong>Continuar borrador</strong>. El borrador no es una orden guardada ni un backup; al terminar presioná <strong>Crear Orden</strong> o <strong>Actualizar</strong>. <strong>Descartar borrador</strong> pide confirmación cuando hay cambios.</li>
+          <li>Después de elegir el vehículo, podés traer descripción y observaciones de uno de sus servicios. Se agregan al texto existente sin cambiar fechas, estado ni presupuesto.</li>
+          <li>El botón <strong>WhatsApp</strong> de cada orden abre una vista previa editable. Revisá el teléfono y el mensaje; las notas internas y el presupuesto solo se incluyen si los agregás. <strong>Abrir WhatsApp</strong> prepara el chat: vos confirmás el envío allí. No se adjunta un PDF automáticamente.</li>
         </ol>
       </article>
 

@@ -50,6 +50,20 @@ El cliente se elige al crear el vehículo y después queda fijo. Al editar podé
 
 La orden representa el trabajo pendiente o en curso.
 
+### Consultar Servicios sin perder lo escrito
+
+- Elegí **Continuar después** (también se conserva el borrador al cerrar el formulario con Escape o fuera de él). Después podés ir a Servicios y volver a Órdenes → **Continuar borrador**.
+- Al elegir el vehículo, podés seleccionar un servicio en **Traer información de un servicio de este vehículo** y presionar **Agregar descripción y observaciones**. Se suman al texto existente; revisá estado, fechas y presupuesto por separado.
+- El borrador se conserva en esa pestaña, incluso al recargar si el navegador lo permite. No es una orden guardada ni una copia de seguridad: presioná **Crear Orden** o **Actualizar** antes de terminar de trabajar. Si el navegador no permite conservarlo al recargar, el programa lo avisa.
+- **Descartar borrador** pide confirmación si hay cambios y elimina solo lo que no guardaste. Si la orden original cambió o fue eliminada, el borrador no la sobrescribe: conservá el texto y revisá el registro.
+
+### Compartir el trabajo por WhatsApp
+
+1. Guardá la orden y presioná **WhatsApp** en su fila (disponible en todos los estados).
+2. Revisá el teléfono y la vista previa editable. Corregir el destinatario allí no modifica la ficha del cliente.
+3. Si corresponde, elegí **Agregar observaciones** o **Agregar presupuesto estimado**. Revisá que no incluyan notas internas; el presupuesto no es un comprobante de pago.
+4. Presioná **Abrir WhatsApp** y confirmá el envío dentro de WhatsApp. El programa no envía mensajes automáticamente y no adjunta un PDF. Para compartir un PDF, generá el documento y adjuntalo manualmente en el chat.
+
 El botón de PDF abre un documento para imprimir. Para guardarlo como PDF, usá **Imprimir → Guardar como PDF** en el navegador. Si bloquea la ventana, se descarga el documento HTML para abrirlo e imprimirlo.
 
 ## Registrar un servicio

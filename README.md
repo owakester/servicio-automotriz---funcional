@@ -24,6 +24,12 @@ Para volver a una versión anterior al cambio, **exportá primero un JSON actual
 
 Sistema de gestión integral para talleres automotrices desarrollado con Vue.js 3 y Tailwind CSS.
 
+### Borradores de órdenes y WhatsApp
+
+Las órdenes permiten **Continuar después**, conservar un borrador por pestaña (sessionStorage con respaldo en memoria al navegar) y traer descripción/observaciones de servicios del mismo vehículo sin reemplazar texto. El borrador no se considera un registro ni se incluye en backups; se retira después de un guardado confirmado o al descartarlo expresamente. Si la orden original cambió, se bloquea su sobrescritura desde un borrador antiguo.
+
+El botón **WhatsApp** abre una vista previa editable del trabajo guardado y prepara el chat mediante el [enlace oficial de WhatsApp](https://faq.whatsapp.com/5913398998672934). El envío queda a cargo del operador. DNI/CUIL, notas internas, importes y enlaces privados no se incluyen por defecto; las observaciones y el presupuesto se agregan explícitamente. No se adjuntan documentos automáticamente. `npm run test:order-workflow` verifica estos flujos con datos sintéticos sin conectarse a WhatsApp.
+
 ## ✨ Características
 
 ### 📊 Dashboard

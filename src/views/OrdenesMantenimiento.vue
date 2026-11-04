@@ -6,17 +6,25 @@
       <div>
         <button
           v-if="vehiculos.length > 0"
-          @click="mostrarFormulario = true"
+          @click="abrirNuevaOrden"
           class="btn-primary flex items-center"
         >
           <Plus class="h-4 w-4 mr-2" aria-hidden="true" />
-          Nueva Orden
+          {{ borradorActivo ? 'Continuar orden' : 'Nueva Orden' }}
         </button>
         <router-link v-else to="/vehiculos" class="btn-primary inline-flex items-center">
           <Car class="h-4 w-4 mr-2" aria-hidden="true" />
           Agregar vehículo primero
         </router-link>
       </div>
+    </div>
+
+    <div v-if="borradorActivo && !mostrarFormulario" class="rounded-lg border border-blue-200 bg-blue-50 p-4 flex flex-wrap items-center justify-between gap-3" role="status">
+      <div>
+        <p class="font-medium text-blue-900">Tenés un borrador de orden sin guardar.</p>
+        <p class="text-sm text-blue-800">{{ sesionDisponible ? 'Se conserva en esta pestaña al cambiar de sección o recargar. No es una orden guardada ni un backup.' : 'Solo se conserva al navegar en esta pestaña. El navegador no permite recuperar el borrador después de recargar; guardá la orden antes de cerrar.' }}</p>
+      </div>
+      <div class="flex gap-2"><button type="button" class="btn-primary" @click="reanudarBorrador">Continuar borrador</button><button type="button" class="btn-secondary" @click="descartarFormulario">Descartar</button></div>
     </div>
 
     <!-- Estadísticas -->
@@ -158,15 +166,15 @@
               <td>${{ orden.costoEstimado?.toLocaleString() || 'Sin presupuesto' }}</td>
               <td>
                 <div class="flex space-x-2">
-                  <!-- Botón WhatsApp para notificar que está listo -->
+                  <!-- Vista previa del trabajo, disponible para cualquier estado -->
                   <button
-                    v-if="orden.estado === 'completada'"
-                    @click="notificarClienteWhatsApp(orden)"
-                    class="p-2 text-green-600 hover:text-green-800 transition-colors"
-                  title="Notificar por WhatsApp que está listo"
-                  :aria-label="`Notificar por WhatsApp que la orden ${orden.numeroOrden} está lista`"
+                    @click="ordenACompartir = orden"
+                    class="p-2 text-green-700 hover:text-green-900 transition-colors inline-flex items-center gap-1"
+                    title="Compartir orden por WhatsApp"
+                    :aria-label="`Compartir orden ${orden.numeroOrden} por WhatsApp`"
                   >
                     <MessageCircle class="h-4 w-4" aria-hidden="true" />
+                    <span class="text-xs">WhatsApp</span>
                   </button>
                   <!-- Botón para compartir fotos -->
                   <button
@@ -219,7 +227,7 @@
           </p>
           <button
             v-if="!hayFiltros"
-            @click="vehiculos.length === 0 ? router.push('/vehiculos') : (mostrarFormulario = true)"
+            @click="vehiculos.length === 0 ? router.push('/vehiculos') : abrirNuevaOrden()"
             class="btn-primary"
           >
             {{ vehiculos.length === 0 ? 'Ir a Vehículos' : 'Crear Primera Orden' }}
@@ -237,10 +245,14 @@
     >
       <div v-focus-trap class="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="order-form-title" tabindex="-1">
         <h2 id="order-form-title" class="text-xl font-bold text-gray-900 mb-4">
-          {{ ordenEditando ? 'Editar Orden' : 'Nueva Orden de Mantenimiento' }}
+          {{ ordenBorradorId != null ? 'Editar Orden' : 'Nueva Orden de Mantenimiento' }}
         </h2>
+        <p class="text-sm text-gray-600 mb-4">Podés elegir <strong>Continuar después</strong> para consultar Servicios y volver sin perder lo escrito. Para registrar la orden, presioná {{ ordenBorradorId != null ? 'Actualizar' : 'Crear Orden' }}.</p>
+        <p v-if="ordenBorradorId != null && !ordenEditando" class="text-sm font-medium text-red-700 mb-4" role="alert">La orden de este borrador ya no existe. Conservá el texto que necesites antes de descartar el borrador; no se creará otra orden automáticamente.</p>
+        <p v-if="!sesionDisponible" class="text-sm text-amber-900 mb-4" role="status">Este navegador no permite guardar el borrador de sesión. Se conserva al cambiar de sección, pero no después de recargar o cerrar.</p>
 
         <form @submit.prevent="guardarOrden" class="space-y-4">
+          <fieldset :disabled="guardando" class="min-w-0 space-y-4">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label for="order-client-search" class="block text-sm font-medium text-gray-700 mb-1">Buscar cliente</label>
@@ -271,6 +283,16 @@
               </select>
               <p class="mt-1 text-sm text-gray-500">{{ formulario.clienteId && vehiculosDisponibles.length === 0 ? 'Este cliente no tiene vehículos. Registrá uno en Vehículos para crear la orden.' : 'Podés elegir primero el cliente o directamente el vehículo.' }}</p>
             </div>
+          </div>
+
+          <div v-if="serviciosDelVehiculo.length" class="rounded-lg bg-blue-50 border border-blue-200 p-3 space-y-2">
+            <label for="order-source-service" class="block text-sm font-medium text-blue-900">Traer información de un servicio de este vehículo</label>
+            <select id="order-source-service" v-model="servicioOrigenId" class="input-field">
+              <option value="">Seleccionar servicio</option>
+              <option v-for="servicio in serviciosDelVehiculo" :key="servicio.id" :value="servicio.id">{{ formatearFecha(servicio.fechaServicio) }} — {{ servicio.tipoServicio }}</option>
+            </select>
+            <button type="button" class="btn-secondary text-sm" :disabled="!servicioOrigenId || guardando" @click="traerServicio">Agregar descripción y observaciones</button>
+            <p class="text-xs text-blue-800">Se agregan al texto existente, sin reemplazarlo. No cambia el presupuesto, estado ni fechas de la orden.</p>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -382,24 +404,30 @@
             />
           </div>
 
-          <div class="flex justify-end space-x-3 pt-4">
+          <div class="flex flex-wrap justify-end gap-3 pt-4">
+            <button type="button" @click="descartarFormulario" :disabled="guardando" class="text-red-700 underline text-sm">Descartar borrador</button>
             <button
               type="button"
               @click="cancelarFormulario"
+              :disabled="guardando"
               class="btn-secondary"
             >
-              Cancelar
+              Continuar después
             </button>
             <button
               type="submit"
+              :disabled="guardando"
               class="btn-primary"
             >
-              {{ ordenEditando ? 'Actualizar' : 'Crear Orden' }}
+              {{ guardando ? 'Guardando…' : ordenBorradorId != null ? 'Actualizar' : 'Crear Orden' }}
             </button>
           </div>
+          </fieldset>
         </form>
       </div>
     </div>
+
+    <CompartirOrdenWhatsApp v-if="ordenACompartir" :key="ordenACompartir.id" :orden="ordenACompartir" @cerrar="ordenACompartir = null" />
 
     <!-- Dialog de Confirmación -->
     <ConfirmDialog
@@ -415,7 +443,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
   Plus, 
@@ -431,12 +459,15 @@ import {
 } from 'lucide-vue-next'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import ImageUploader from '../components/ImageUploader.vue'
+import CompartirOrdenWhatsApp from '../components/CompartirOrdenWhatsApp.vue'
+import { useBorradorOrden, firmaOrdenEditable } from '../composables/useBorradorOrden'
+import { useDiskStorage } from '../composables/useDiskStorage'
 import { useOrdenes } from '../composables/useOrdenes'
 import { useAutoService } from '../composables/useAutoService'
 import { usePDF } from '../composables/usePDF'
 import { useGoogleDrive } from '../composables/useGoogleDrive'
 import { useNotifications } from '../composables/useNotifications'
-import { estaFechaVencida, formatearFecha, fechaParaInput } from '../utils/dates'
+import { estaFechaVencida, formatearFecha } from '../utils/dates'
 import { useFechaActual } from '../composables/useFechaActual'
 import ClienteIdentificacion from '../components/ClienteIdentificacion.vue'
 import { etiquetaCliente, coincideDniCuil } from '../utils/clientIdentity'
@@ -456,10 +487,10 @@ const {
 
 const { 
   clientes,
+  servicios,
   vehiculos, 
   obtenerVehiculoPorId, 
   obtenerClientePorId,
-  notificarAutoListo,
   compartirFotos,
   abrirWhatsApp
 } = useAutoService()
@@ -467,10 +498,14 @@ const { generarPDFOrden } = usePDF()
 const { initializeGoogleDrive, authenticateUser, subirOrdenAGoogleDrive, estaAutenticado, getDebugInfo, diagnosticarProblemas } = useGoogleDrive()
 const { success, error } = useNotifications()
 const router = useRouter()
+const { guardando } = useDiskStorage()
+const { formulario, ordenId: ordenBorradorId, versionOriginal, activo: borradorActivo, hayCambios, sesionDisponible, iniciar: iniciarBorrador, descartar: descartarBorrador, incorporarServicio } = useBorradorOrden()
 
 // Estado del componente
 const mostrarFormulario = ref(false)
-const ordenEditando = ref(null)
+const ordenEditando = computed(() => ordenBorradorId.value == null ? null : ordenesCompletas.value.find(orden => String(orden.id) === String(ordenBorradorId.value)))
+const ordenACompartir = ref(null)
+const servicioOrigenId = ref('')
 const filtroTexto = ref('')
 const filtroEstado = ref('')
 const filtroPrioridad = ref('')
@@ -487,17 +522,9 @@ const confirmacion = ref({
   accion: null
 })
 
-// Formulario
-const formulario = ref({
-  vehiculoId: '',
-  clienteId: '',
-  estado: 'pendiente',
-  prioridad: 'media',
-  fechaVencimiento: '',
-  costoEstimado: '',
-  descripcionTrabajo: '',
-  observaciones: ''
-})
+const serviciosDelVehiculo = computed(() => servicios.value.filter(servicio =>
+  formulario.value.vehiculoId && String(servicio.vehiculoId) === String(formulario.value.vehiculoId) && String(servicio.clienteId) === String(formulario.value.clienteId)
+).sort((a, b) => String(b.fechaServicio).localeCompare(String(a.fechaServicio))))
 
 // Computed
 const ordenesFiltradas = computed(() => {
@@ -549,6 +576,7 @@ const vehiculosDisponibles = computed(() => vehiculos.value.filter(vehiculo =>
   !formulario.value.clienteId || String(vehiculo.clienteId) === String(formulario.value.clienteId)
 ))
 const onClienteChange = () => {
+  servicioOrigenId.value = ''
   const disponibles = vehiculosDisponibles.value
   if (!disponibles.some(vehiculo => String(vehiculo.id) === String(formulario.value.vehiculoId))) {
     formulario.value.vehiculoId = ''
@@ -579,19 +607,12 @@ const formatearPrioridad = (prioridad) => {
 
 const limpiarFormulario = () => {
   busquedaCliente.value = ''
-  formulario.value = {
-    vehiculoId: '',
-    clienteId: '',
-    estado: 'pendiente',
-    prioridad: 'media',
-    fechaVencimiento: '',
-    costoEstimado: '',
-    descripcionTrabajo: '',
-    observaciones: ''
-  }
+  servicioOrigenId.value = ''
+  descartarBorrador()
 }
 
 const onVehiculoChange = () => {
+  servicioOrigenId.value = ''
   if (formulario.value.vehiculoId) {
     const vehiculo = obtenerVehiculoPorId(parseInt(formulario.value.vehiculoId))
     if (vehiculo) {
@@ -601,19 +622,34 @@ const onVehiculoChange = () => {
 }
 
 const editarOrden = (orden) => {
+  if (guardando.value) return
+  if (borradorActivo.value && String(ordenBorradorId.value) === String(orden.id)) { reanudarBorrador(); return }
+  if (borradorActivo.value && hayCambios.value && !confirm('Hay un borrador sin guardar. ¿Descartarlo para editar esta otra orden?')) return
   busquedaCliente.value = ''
-  ordenEditando.value = orden
-  formulario.value = {
-    ...orden,
-    vehiculoId: orden.vehiculoId.toString(),
-    clienteId: orden.clienteId.toString(),
-    fechaVencimiento: orden.fechaVencimiento ? fechaParaInput(orden.fechaVencimiento) : '',
-    costoEstimado: orden.costoEstimado || ''
-  }
+  servicioOrigenId.value = ''
+  iniciarBorrador(orden)
   mostrarFormulario.value = true
 }
 
+const reanudarBorrador = () => { mostrarFormulario.value = true }
+const abrirNuevaOrden = () => {
+  if (guardando.value) return
+  if (!borradorActivo.value) iniciarBorrador()
+  reanudarBorrador()
+}
+const traerServicio = () => {
+  const servicio = servicios.value.find(item => String(item.id) === String(servicioOrigenId.value))
+  if (!incorporarServicio(servicio)) { error('Seleccioná un servicio del mismo vehículo y cliente de la orden.'); return }
+  success('Descripción y observaciones agregadas al borrador. Revisá y guardá la orden.')
+  servicioOrigenId.value = ''
+}
+
 const guardarOrden = async () => {
+  if (guardando.value) return
+  if (ordenBorradorId.value != null && (!ordenEditando.value || firmaOrdenEditable(ordenEditando.value) !== versionOriginal.value)) {
+    error('La orden original cambió o fue eliminada mientras existía este borrador. Conservá el texto y revisá la orden antes de reemplazar datos.', { persistent: true })
+    return
+  }
   // El cliente siempre pertenece al vehículo; el selector solo facilita encontrarlo.
   const vehiculo = obtenerVehiculoPorId(Number(formulario.value.vehiculoId))
   if (!vehiculo || !obtenerClientePorId(vehiculo.clienteId)) {
@@ -637,14 +673,21 @@ const guardarOrden = async () => {
   const resultado = ordenEditando.value
     ? await actualizarOrden(ordenEditando.value.id, datosOrden)
     : await crearOrden(datosOrden)
-  if (resultado) cancelarFormulario()
+  if (resultado) { mostrarFormulario.value = false; limpiarFormulario() }
 }
 
 const cancelarFormulario = () => {
+  if (guardando.value) return
+  if (hayCambios.value) borradorActivo.value = true
+  else limpiarFormulario()
   mostrarFormulario.value = false
-  ordenEditando.value = null
+}
+const descartarFormulario = () => {
+  if (guardando.value || (hayCambios.value && !confirm('¿Descartar este borrador? Se perderá lo escrito sin guardar. Los registros guardados no se modifican.'))) return
+  mostrarFormulario.value = false
   limpiarFormulario()
 }
+onBeforeUnmount(() => { if (mostrarFormulario.value) cancelarFormulario() })
 
 const eliminarOrdenConfirm = (ordenId) => {
   const orden = ordenesCompletas.value.find(o => o.id === ordenId)
@@ -786,14 +829,6 @@ const mostrarDebugInfo = () => {
 }
 
 // FUNCIONES DE WHATSAPP 📱
-
-// Función para notificar al cliente que su auto está listo
-const notificarClienteWhatsApp = (orden) => {
-  const enlace = notificarAutoListo(orden)
-  if (enlace) {
-    abrirWhatsApp(enlace)
-  }
-}
 
 // Función para compartir fotos del trabajo
 const compartirFotosWhatsApp = (orden) => {
