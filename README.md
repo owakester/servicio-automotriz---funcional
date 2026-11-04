@@ -45,6 +45,8 @@ El botón **WhatsApp** abre una vista previa editable del trabajo guardado y pre
 - 🔗 Vinculación con vehículos
 
 ### 🚗 Gestión de Vehículos
+
+- Patentes/placas argentinas o extranjeras, sin exigir un formato de país: de 1 a 20 letras o números. Se mantiene el control de duplicados ignorando mayúsculas, espacios y guiones.
 - ✅ CRUD completo con validaciones
 - 🔍 Filtros por cliente, marca y alertas
 - ⚠️ Sistema de alertas automáticas

@@ -9,10 +9,22 @@ export const crearIdUnico = (ahora = Date.now()) => {
 export const normalizarEmail = (email = '') => email.trim().toLowerCase()
 
 export const normalizarPatente = (patente = '') =>
-  patente.toUpperCase().replace(/[\s-]/g, '')
+  typeof patente === 'string' ? patente.toUpperCase().replace(/[\s-]/g, '') : ''
 
-export const esPatenteArgentinaValida = (patente) =>
-  /^(?:[A-Z]{3}\d{3}|[A-Z]{2}\d{3}[A-Z]{2})$/.test(normalizarPatente(patente))
+export const MENSAJE_PATENTE_INVALIDA = 'Patente/placa inválida. Usá de 1 a 20 letras o números, con espacios o guiones opcionales.'
+
+// No validar el formato legal de un país: el taller también recibe vehículos
+// extranjeros. Se mantiene la normalización anterior para no alterar backups.
+export const esPatenteValida = patente => {
+  if (typeof patente !== 'string' || !/^[\p{L}\p{M}\p{N}\p{Zs}-]+$/u.test(patente)) return false
+  const normalizada = normalizarPatente(patente)
+  return /^[\p{L}\p{M}\p{N}]{1,20}$/u.test(normalizada) && /[\p{L}\p{N}]/u.test(normalizada)
+}
+
+export const coincidePatente = (patente, busqueda) => {
+  const texto = normalizarPatente(busqueda)
+  return Boolean(texto) && normalizarPatente(patente).includes(texto)
+}
 
 export const idsIguales = (primero, segundo) =>
   primero !== null && primero !== undefined && segundo !== null && segundo !== undefined &&

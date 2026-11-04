@@ -195,6 +195,43 @@ await probar('la patente no puede repetirse ignorando mayúsculas y separadores'
   assert.equal(datos.vehiculos.value.length, 1, 'Se aceptó una patente duplicada')
 })
 
+await probar('acepta placas sin formato de país, incluso numéricas o de otros alfabetos', async () => {
+  const owner = datos.agregarCliente({ nombre: 'Titular de pruebas' })
+  const validation = useFormValidation()
+  for (const plate of ['ABC123', 'AB123CD', 'ABC1D23', 'B-1234', 'GH45', '1234567', 'A', 'M Ü 1234', '京A12345']) {
+    assert.equal(validation.validatePatente(plate), true, plate)
+    const vehicle = datos.agregarVehiculo({ clienteId: owner.id, marca: 'Marca', modelo: 'Modelo', patente: plate })
+    assert.ok(vehicle, plate)
+    assert.equal(vehicle.patente, plate.toUpperCase().replace(/[\s-]/g, ''))
+  }
+  assert.equal(datos.vehiculos.value.length, 9)
+})
+
+await probar('placas vacías, caracteres extraños o más de 20 letras/números no modifican registros', async () => {
+  const owner = datos.agregarCliente({ nombre: 'Titular de pruebas' })
+  const validation = useFormValidation()
+  for (const plate of ['', '   ', '--', 'A'.repeat(21), 'ABC/123', '<script>', 'AB\n123', null, 1234]) {
+    assert.equal(datos.agregarVehiculo({ clienteId: owner.id, marca: 'Marca', modelo: 'Modelo', patente: plate }), null)
+    if (plate) assert.equal(validation.validatePatente(plate), false)
+    assert.equal(datos.vehiculos.value.length, 0)
+  }
+  assert.ok(datos.agregarVehiculo({ clienteId: owner.id, marca: 'Marca', modelo: 'Modelo', patente: 'A'.repeat(20) }))
+})
+
+await probar('editar placas extranjeras conserva identidad y rechaza duplicados con otros separadores', async () => {
+  const owner = datos.agregarCliente({ nombre: 'Titular de pruebas' })
+  const first = datos.agregarVehiculo({ clienteId: owner.id, marca: 'Marca', modelo: 'Uno', patente: 'ABC1D23' })
+  const second = datos.agregarVehiculo({ clienteId: owner.id, marca: 'Marca', modelo: 'Dos', patente: '1234567' })
+  const updated = datos.actualizarVehiculo(first.id, { patente: 'b-1234' })
+  assert.equal(updated.patente, 'B1234')
+  assert.equal(updated.id, first.id)
+  assert.equal(updated.clienteId, owner.id)
+  const before = JSON.stringify(datos.vehiculos.value)
+  assert.equal(datos.actualizarVehiculo(second.id, { patente: 'B 12-34' }), null)
+  assert.equal(datos.actualizarVehiculo(first.id, { patente: '??' }), null)
+  assert.equal(JSON.stringify(datos.vehiculos.value), before)
+})
+
 await probar('no se elimina un cliente que conserva vehículos asociados', async () => {
   const cliente = datos.agregarCliente({ nombre: 'Titular', email: 'titular@example.com', telefono: '1111111111' })
   datos.agregarVehiculo({ clienteId: cliente.id, marca: 'Ford', modelo: 'Focus', patente: 'AB123CD' })

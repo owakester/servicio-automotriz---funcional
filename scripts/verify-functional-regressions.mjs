@@ -43,6 +43,7 @@ const compiled = await build({
       "export { default as OrdenesView } from './src/views/OrdenesMantenimiento.vue'",
       "export { default as ClientesView } from './src/views/Clientes.vue'",
       "export { default as ServiciosView } from './src/views/Servicios.vue'",
+      "export { default as VehiculosView } from './src/views/Vehiculos.vue'",
       "export { default as ProximoServicio } from './src/components/ProximoServicio.vue'",
       "export { createSSRApp, h } from 'vue'",
       "export { renderToString } from '@vue/server-renderer'",
@@ -59,7 +60,7 @@ const compiled = await build({
     name: 'order-form-script',
     setup(builder) {
       builder.onLoad({ filter: /\.vue$/ }, ({ path }) => {
-        if (!/[/\\](OrdenesMantenimiento|Clientes|Servicios|ProximoServicio)\.vue$/.test(path)) return { contents: 'export default {}', loader: 'js' }
+        if (!/[/\\](OrdenesMantenimiento|Clientes|Servicios|Vehiculos|ProximoServicio)\.vue$/.test(path)) return { contents: 'export default {}', loader: 'js' }
         const { descriptor } = parse(readFileSync(path, 'utf8'))
         return { contents: compileScript(descriptor, { id: 'order-form-regression', inlineTemplate: path.endsWith('ProximoServicio.vue') }).content, loader: 'js' }
       })
@@ -503,6 +504,34 @@ try {
       serviceForm.cerrarDetalle()
       assert.equal(serviceForm.servicioDetalle.value, null)
       assert.equal(JSON.stringify(current(app)), snapshot)
+    } finally { app.reemplazarDatos(before) }
+  })
+
+  await check('el formulario permite crear, editar y buscar placas extranjeras y muestra errores junto al campo', async () => {
+    const before = JSON.parse(JSON.stringify(current(app)))
+    try {
+      let form
+      const screen = mod.createSSRApp({ setup() { form = mod.VehiculosView.setup({}, { expose() {} }); return () => mod.h('div') } })
+      screen.use(mod.createRouter({ history: mod.createMemoryHistory('/'), routes: [{ path: '/', component: {} }] }))
+      await mod.renderToString(screen)
+      const owner = app.agregarCliente({ nombre: 'Cliente placa extranjera' })
+      form.formulario.value = { clienteId: owner.id, marca: 'Marca QA', modelo: 'Modelo QA', patente: 'b-1234', anio: '2020' }
+      await form.guardarVehiculo()
+      const created = app.vehiculos.value.find(v => v.patente === 'B1234')
+      assert.ok(created)
+      form.editarVehiculo(created)
+      form.formulario.value.patente = '1234567'
+      await form.guardarVehiculo()
+      const updated = app.vehiculos.value.find(v => v.id === created.id)
+      assert.equal(updated.patente, '1234567')
+      form.filtroTexto.value = '123-4567'
+      assert.deepEqual(form.vehiculosFiltrados.value.map(v => v.id), [created.id])
+      form.editarVehiculo(updated)
+      form.formulario.value.patente = '??'
+      await form.guardarVehiculo()
+      assert.match(form.getError('patente'), /Patente\/placa inválida/)
+      assert.equal(form.mostrarFormulario.value, true)
+      assert.equal(app.vehiculos.value.find(v => v.id === created.id).patente, '1234567')
     } finally { app.reemplazarDatos(before) }
   })
 

@@ -72,7 +72,7 @@
           <li>Primero asegurate de que el dueño esté registrado.</li>
           <li>Entrá en <strong>Vehículos</strong> y seleccioná <strong>Nuevo Vehículo</strong>.</li>
           <li>Elegí el cliente y completá patente, marca, modelo y año.</li>
-          <li>La patente debe tener formato <strong>ABC123</strong> o <strong>AB123CD</strong>.</li>
+          <li>La <strong>patente/placa</strong> puede ser argentina o extranjera: de 1 a 20 letras o números, sin exigir un formato de país. Podés escribir espacios y guiones; se ignoran al guardar. No se permiten placas repetidas.</li>
         </ol>
         <p class="mt-4 text-sm text-gray-600">Un vehículo con servicios u órdenes no puede eliminarse por error.</p>
         <p class="mt-2 text-sm text-gray-600">El cliente se asigna al crear el vehículo y no se puede cambiar al editarlo.</p>

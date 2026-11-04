@@ -176,6 +176,16 @@ try {
     mod = await load(); app = mod.useAutoService(); await app.inicializacionDatos
     assert.equal(app.clientes.value.length, before)
   })
+  await check('placas extranjeras y numéricas se confirman en SQLite y se conservan al recargar', async () => {
+    const owner = app.clientes.value[0]
+    const vehicle = await app.agregarVehiculo({ clienteId: owner.id, marca: 'Marca QA', modelo: 'Modelo QA', patente: 'b-1234' })
+    assert.equal(vehicle.patente, 'B1234')
+    assert.equal(await app.agregarVehiculo({ clienteId: owner.id, marca: 'Duplicado', modelo: 'QA', patente: 'B 1234' }), null)
+    assert.ok(await app.actualizarVehiculo(vehicle.id, { patente: '1234567' }))
+    const loaded = await load(); const fresh = loaded.useAutoService(); await fresh.inicializacionDatos
+    assert.equal(fresh.vehiculos.value.find(v => v.id === vehicle.id).patente, '1234567')
+    assert.ok(await app.eliminarVehiculo(vehicle.id))
+  })
   await check('CRUD de las cuatro colecciones se confirma en disco y conserva el estado al recargar', async () => {
     const client = await app.agregarCliente({ nombre: 'CRUD cliente', dniCuil: '12345678' })
     const car = await app.agregarVehiculo({ clienteId: client.id, marca: 'Fiat', modelo: 'QA', patente: 'AB456CD' })

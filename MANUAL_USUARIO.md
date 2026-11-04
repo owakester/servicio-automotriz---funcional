@@ -36,7 +36,7 @@ El programa no permite repetir emails. Un cliente con vehículos asociados no pu
 4. Completá patente, marca, modelo y año.
 5. Presioná **Crear**.
 
-La patente debe tener formato `ABC123` o `AB123CD`. No se permiten patentes repetidas.
+La patente/placa puede ser argentina o extranjera. Es obligatoria, pero no necesita un formato de país: admite de 1 a 20 letras o números, incluso placas solo numéricas. Podés escribir espacios y guiones; se ignoran al guardar. No se permiten placas repetidas, aunque cambien las mayúsculas, espacios o guiones.
 
 El cliente se elige al crear el vehículo y después queda fijo. Al editar podés corregir los datos del automóvil, pero no cambiar el cliente asociado.
 

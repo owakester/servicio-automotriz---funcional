@@ -16,7 +16,8 @@ import {
 } from './useDataRecovery'
 import {
   crearIdUnico,
-  esPatenteArgentinaValida,
+  esPatenteValida,
+  MENSAJE_PATENTE_INVALIDA,
   existeValorDuplicado,
   idsIguales,
   normalizarEmail,
@@ -604,8 +605,8 @@ Todo perfecto! ✨
       error('El vehículo necesita marca y modelo')
       return null
     }
-    if (!esPatenteArgentinaValida(patente)) {
-      error('La patente debe tener formato ABC123 o AB123CD')
+    if (!esPatenteValida(vehiculo.patente)) {
+      error(MENSAJE_PATENTE_INVALIDA)
       return null
     }
     if (existeValorDuplicado(vehiculos.value, 'patente', patente)) {
@@ -640,8 +641,8 @@ Todo perfecto! ✨
         error('El vehículo necesita marca y modelo')
         return null
       }
-      if (!esPatenteArgentinaValida(patente)) {
-        error('La patente debe tener formato ABC123 o AB123CD')
+      if (!esPatenteValida(vehiculoCombinado.patente)) {
+        error(MENSAJE_PATENTE_INVALIDA)
         return null
       }
       if (existeValorDuplicado(vehiculos.value, 'patente', patente, id)) {

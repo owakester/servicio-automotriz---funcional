@@ -255,17 +255,22 @@
 
           <div>
             <label for="vehicle-plate" class="block text-sm font-medium text-gray-700 mb-1">
-              Patente *
+              Patente / placa *
             </label>
             <input
               v-model="formulario.patente"
               id="vehicle-plate"
               type="text"
               required
+              :aria-invalid="Boolean(getError('patente'))"
+              :aria-describedby="getError('patente') ? 'vehicle-plate-help vehicle-plate-error' : 'vehicle-plate-help'"
               class="input-field"
-              placeholder="ABC123"
+              :class="{ 'border-red-500': getError('patente') }"
+              placeholder="Ej.: ABC123, ABC1D23 o B-1234"
               style="text-transform: uppercase"
             />
+            <p id="vehicle-plate-help" class="mt-1 text-xs text-gray-500">Argentina o extranjera. Hasta 20 letras o números; los espacios y guiones se ignoran al guardar.</p>
+            <p v-if="getError('patente')" id="vehicle-plate-error" class="mt-1 text-sm text-red-700" role="alert">{{ getError('patente') }}</p>
           </div>
 
           <div class="grid grid-cols-2 gap-4">
@@ -432,6 +437,8 @@ import {
 import { useAutoService } from '../composables/useAutoService'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import { useNotifications } from '../composables/useNotifications'
+import { useFormValidation } from '../composables/useFormValidation'
+import { coincidePatente } from '../utils/dataIntegrity'
 import { formatearFecha } from '../utils/dates'
 import ClienteIdentificacion from '../components/ClienteIdentificacion.vue'
 import { etiquetaCliente, coincideDniCuil } from '../utils/clientIdentity'
@@ -461,6 +468,7 @@ const filtroAlerta = ref('')
 const mostrarConfirmacion = ref(false)
 const vehiculoAEliminar = ref(null)
 const { warning } = useNotifications()
+const { validateRequired, validatePatente, clearErrors, getError } = useFormValidation()
 
 // Formulario
 const formulario = ref({
@@ -488,7 +496,7 @@ const vehiculosFiltrados = computed(() => {
   if (filtroTexto.value) {
     const filtro = filtroTexto.value.toLowerCase()
     resultado = resultado.filter(vehiculo => 
-      vehiculo.patente.toLowerCase().includes(filtro) ||
+      coincidePatente(vehiculo.patente, filtro) ||
       vehiculo.marca.toLowerCase().includes(filtro) ||
       vehiculo.modelo.toLowerCase().includes(filtro) ||
       vehiculo.cliente?.nombre?.toLowerCase().includes(filtro) ||
@@ -528,6 +536,7 @@ const getAlertaTexto = (alerta) => {
 }
 
 const limpiarFormulario = () => {
+  clearErrors()
   formulario.value = {
     clienteId: '',
     patente: '',
@@ -543,15 +552,17 @@ const limpiarFormulario = () => {
 }
 
 const editarVehiculo = (vehiculo) => {
+  clearErrors()
   vehiculoEditando.value = vehiculo
   formulario.value = { ...vehiculo }
   mostrarFormulario.value = true
 }
 
 const guardarVehiculo = async () => {
+  clearErrors()
+  if (!validateRequired(formulario.value.patente, 'patente') || !validatePatente(formulario.value.patente)) return
   const datosVehiculo = {
     ...formulario.value,
-    patente: formulario.value.patente.toUpperCase(),
     anio: parseInt(formulario.value.anio),
     kilometraje: formulario.value.kilometraje ? parseInt(formulario.value.kilometraje) : 0,
     clienteId: vehiculoEditando.value ? vehiculoEditando.value.clienteId : parseInt(formulario.value.clienteId)

@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import { esDniCuilValido } from '../utils/clientIdentity'
+import { esPatenteValida, MENSAJE_PATENTE_INVALIDA } from '../utils/dataIntegrity'
 
 export const useFormValidation = () => {
   const errors = ref({})
@@ -43,10 +44,8 @@ export const useFormValidation = () => {
   }
 
   const validatePatente = (patente, fieldName = 'patente') => {
-    // Formato argentino: ABC123 o AB123CD
-    const patenteRegex = /^[A-Z]{2,3}\d{3}[A-Z]{0,2}$/
-    if (patente && !patenteRegex.test(patente.toUpperCase())) {
-      errors.value[fieldName] = 'Formato de patente inválido (ej: ABC123)'
+    if (patente && !esPatenteValida(patente)) {
+      errors.value[fieldName] = MENSAJE_PATENTE_INVALIDA
       return false
     }
     delete errors.value[fieldName]

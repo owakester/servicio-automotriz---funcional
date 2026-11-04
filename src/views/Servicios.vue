@@ -572,6 +572,7 @@ import {
   Search
 } from 'lucide-vue-next'
 import { useAutoService } from '../composables/useAutoService'
+import { coincidePatente } from '../utils/dataIntegrity'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import { usePagination } from '../composables/usePagination'
 import { useDebounce, useMemoize } from '../composables/useOptimization'
@@ -665,7 +666,7 @@ const serviciosFiltrados = computed(() => {
       servicio.observaciones?.toLowerCase().includes(filtro) ||
       servicio.vehiculo?.marca?.toLowerCase().includes(filtro) ||
       servicio.vehiculo?.modelo?.toLowerCase().includes(filtro) ||
-      servicio.vehiculo?.patente?.toLowerCase().includes(filtro) ||
+      coincidePatente(servicio.vehiculo?.patente, filtro) ||
       servicio.cliente?.nombre?.toLowerCase().includes(filtro) ||
       coincideDniCuil(servicio.cliente?.dniCuil, filtro)
     )
