@@ -4,6 +4,7 @@ import { useNotifications } from './useNotifications'
 import { diasHastaFecha, fechaParaInput, formatearFecha } from '../utils/dates'
 import { formatearDniCuil } from '../utils/clientIdentity'
 import { ultimosCompletadosPorTipo } from '../utils/serviceReminders'
+import { crearCSV } from '../utils/csv'
 
 export const useProximosServicios = () => {
   const { vehiculos, servicios, obtenerClientePorId } = useAutoService()
@@ -48,7 +49,7 @@ export const useProximosServicios = () => {
           ultimo_servicio_tipo: ultimoServicio.tipoServicio,
           ultimo_servicio_km: ultimoServicio.kilometrajeActual || 0,
           ultimo_servicio_costo: ultimoServicio.costo || 0,
-          observaciones: (ultimoServicio.observaciones || '').replace(/"/g, '""')
+          observaciones: ultimoServicio.observaciones || ''
         })
       }
     })
@@ -64,12 +65,12 @@ export const useProximosServicios = () => {
     ]
     const filas = datos.map(s => [
       formatearFecha(s.fecha_proximo_servicio),
-      s.dias_restantes, s.estado, s.prioridad, `"${s.cliente_nombre}"`, s.cliente_dni_cuil || '', s.cliente_telefono,
+      s.dias_restantes, s.estado, s.prioridad, s.cliente_nombre, s.cliente_dni_cuil || '', s.cliente_telefono,
       s.cliente_email, s.vehiculo_marca, s.vehiculo_modelo, s.vehiculo_patente, s.vehiculo_año,
       s.vehiculo_color, formatearFecha(s.ultimo_servicio_fecha),
-      `"${s.ultimo_servicio_tipo}"`, s.ultimo_servicio_km, s.ultimo_servicio_costo, `"${s.observaciones}"`
+      s.ultimo_servicio_tipo, s.ultimo_servicio_km, s.ultimo_servicio_costo, s.observaciones
     ])
-    return [headers, ...filas].map(fila => fila.join(',')).join('\n')
+    return crearCSV(headers, filas)
   }
 
   const descargarCSVLocal = () => {
@@ -81,7 +82,7 @@ export const useProximosServicios = () => {
       const csvContent = convertirACSV(datosServicios)
       if (!csvContent) return;
 
-      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
       const fechaHoy = fechaParaInput()
       const nombreArchivo = `proximos_servicios_${fechaHoy}.csv`
       const link = document.createElement('a')

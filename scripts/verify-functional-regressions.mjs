@@ -4,6 +4,7 @@ import 'fake-indexeddb/auto'
 import { IDBFactory } from 'fake-indexeddb'
 import { readFileSync } from 'node:fs'
 import { parse, compileScript } from '@vue/compiler-sfc'
+import { parse as leerCSV } from 'csv-parse/sync'
 
 // Todo ocurre en almacenamientos simulados, sin tocar los datos del navegador.
 class LocalStorageMock {
@@ -275,14 +276,14 @@ try {
       app.actualizarCliente(client.id, { dniCuil: '20-12345678-6' })
       const sinServicios = app.agregarCliente({ nombre: 'Cliente sin servicios QA', dniCuil: '87654321' })
       const ultimoServicio = [...app.servicios.value].sort((a, b) => mod.parsearFechaLocal(b.fechaServicio) - mod.parsearFechaLocal(a.fechaServicio))[0]
-      app.actualizarServicio(ultimoServicio.id, { estado: 'completado', proximoServicio: '2026-10-07' })
+      assert.ok(app.actualizarServicio(ultimoServicio.id, { estado: 'completado', proximoServicio: '2026-11-07' }))
       const identityReports = mod.useReports()
       assert.equal(identityReports.getClientesFrecuentes()[0].dniCuil, '20123456786')
       identityReports.exportarClientes()
       let csv = await csvBlob.text()
       assert.match(csv.split('\n')[0], /DNI\/CUIL/)
       assert.match(csv, /20-12345678-6/)
-      assert.match(csv, /Cliente sin servicios QA,87654321/)
+      assert.ok(leerCSV(csv, { bom: true, columns: true }).some(fila => fila.Nombre === 'Cliente sin servicios QA' && fila['DNI/CUIL'] === '87654321'))
       identityReports.exportarServicios('2026-10-01', '2026-10-31')
       assert.match(await csvBlob.text(), /20-12345678-6/)
 

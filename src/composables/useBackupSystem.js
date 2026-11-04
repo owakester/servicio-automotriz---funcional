@@ -8,6 +8,7 @@ import { crearSnapshotRecuperacion, useDataRecovery, validarDatosAutoservice } f
 import { fechaParaInput, formatearFecha } from '../utils/dates'
 import { formatearDniCuil } from '../utils/clientIdentity'
 import { useDiskStorage, usaDisco } from './useDiskStorage'
+import { crearCSV } from '../utils/csv'
 
 const leerPreferenciaLocal = (clave, valorPorDefecto = null) => {
   try {
@@ -81,25 +82,6 @@ export const useBackupSystem = () => {
     const fecha = new Date()
     const timestamp = fecha.toISOString().replace(/[:.]/g, '-').slice(0, -5)
     return `backup-autoservice-${tipo}-${timestamp}.${extension}`
-  }
-
-  const agregarBOMUTF8 = (contenido) => '\uFEFF' + contenido
-
-  const escaparCSV = (valor) => {
-    if (valor === null || valor === undefined) return '""'
-
-    let texto = String(valor)
-    // Evita que Excel/Sheets interpreten datos ingresados por usuarios como fórmulas.
-    if (/^[=+\-@]/.test(texto)) texto = `'${texto}`
-    return `"${texto.replace(/"/g, '""')}"`
-  }
-
-  const crearCSV = (encabezados, filas) => {
-    const contenido = [
-      encabezados.map(escaparCSV).join(','),
-      ...filas.map(fila => fila.map(escaparCSV).join(','))
-    ].join('\n')
-    return agregarBOMUTF8(contenido)
   }
 
   const formatearFechaCSV = (fecha) => {

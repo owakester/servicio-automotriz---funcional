@@ -1,13 +1,14 @@
 <template>
   <div class="space-y-4">
     <!-- Header del componente -->
-    <div class="flex justify-between items-center">
+    <div class="flex flex-wrap justify-between items-center gap-3 min-w-0">
       <h3 class="text-lg font-semibold text-gray-900">Fotos del Servicio</h3>
-      <div class="flex items-center space-x-2">
+      <div class="flex flex-wrap items-center gap-2 min-w-0">
         <div class="text-sm text-gray-600">
           Estado: {{ estaAutenticado() ? '✅ Conectado' : '❌ Desconectado' }}
         </div>
         <button
+          type="button"
           @click="abrirSelectorArchivos"
           class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center text-sm"
           :disabled="!numeroOrden || subiendoImagen"
@@ -16,6 +17,7 @@
           {{ subiendoImagen ? 'Subiendo...' : 'Agregar Foto' }}
         </button>
         <button
+          type="button"
           @click="debugEstado"
           class="bg-gray-500 hover:bg-gray-600 text-white px-2 py-2 rounded transition-colors text-xs"
           title="Debug"
@@ -23,6 +25,7 @@
           🔍
         </button>
         <button
+          type="button"
           @click="forzarModal"
           class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-2 rounded transition-colors text-xs"
           title="Test Modal"
@@ -67,6 +70,7 @@
           <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all duration-200 flex items-center justify-center">
             <div class="opacity-0 group-hover:opacity-100 transition-opacity flex space-x-2">
               <button
+                type="button"
                 @click="verImagen(imagen)"
                 class="p-2 bg-white text-gray-700 rounded-full hover:bg-gray-100 transition-colors"
                 title="Ver imagen completa"
@@ -74,6 +78,7 @@
                 <Eye class="h-4 w-4" />
               </button>
               <button
+                type="button"
                 @click="eliminarImagen(imagen)"
                 class="p-2 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors"
                 title="Eliminar imagen"
@@ -104,6 +109,7 @@
         {{ estaAutenticado() ? 'Agrega fotos para documentar el trabajo realizado' : 'Conecta Google Drive para subir fotos' }}
       </p>
       <button
+        type="button"
         v-if="estaAutenticado()"
         @click="abrirSelectorArchivos"
         class="btn-primary"
@@ -125,6 +131,7 @@
           class="max-w-full max-h-full object-contain"
         />
         <button
+          type="button"
           @click="cerrarModalImagen"
           class="absolute top-4 right-4 p-2 bg-white bg-opacity-20 text-white rounded-full hover:bg-opacity-30 transition-colors"
         >
@@ -153,7 +160,8 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { focusTrap } from '../directives/focusTrap'
 import { Camera, Image, Eye, Trash2, X, Cloud } from 'lucide-vue-next'
 import { useGoogleDrive } from '../composables/useGoogleDrive'
 import { useNotifications } from '../composables/useNotifications'
@@ -257,7 +265,7 @@ const forzarModal = () => {
         <div style="margin-bottom: 16px; padding: 16px; background-color: #dbeafe; border-radius: 4px;">
           <p style="color: #1e40af; font-weight: 500;">Si puedes ver esto centrado, el modal funciona correctamente</p>
         </div>
-        <button onclick="document.getElementById('modal-test').remove()" style="
+        <button type="button" onclick="document.getElementById('modal-test').remove()" style="
           padding: 8px 16px;
           background-color: #2563eb;
           color: white;
@@ -293,7 +301,7 @@ const mostrarModalSubida = (imagenDataUrl) => {
       z-index: 999999;
       font-family: Arial, sans-serif;
     ">
-      <div style="
+      <div role="dialog" aria-modal="true" aria-label="Subir foto del servicio" tabindex="-1" style="
         background-color: white;
         border-radius: 8px;
         padding: 24px;
@@ -338,7 +346,7 @@ const mostrarModalSubida = (imagenDataUrl) => {
         </div>
 
         <div style="display: flex; justify-content: flex-end; gap: 12px;">
-          <button onclick="cancelarSubidaModal()" style="
+          <button type="button" onclick="cancelarSubidaModal()" style="
             padding: 8px 16px;
             color: #374151;
             background-color: #e5e7eb;
@@ -349,7 +357,7 @@ const mostrarModalSubida = (imagenDataUrl) => {
           ">
             Cancelar
           </button>
-          <button id="btn-subir" onclick="confirmarSubidaModal()" style="
+          <button type="button" id="btn-subir" onclick="confirmarSubidaModal()" style="
             padding: 8px 16px;
             background-color: #2563eb;
             color: white;
@@ -367,6 +375,7 @@ const mostrarModalSubida = (imagenDataUrl) => {
   
   // Insertar en el body
   document.body.insertAdjacentHTML('beforeend', modalHtml)
+  focusTrap.mounted(document.getElementById('modal-subida').firstElementChild)
   
   // Agregar event listener para el contador de caracteres
   const input = document.getElementById('descripcion-input')
@@ -383,12 +392,19 @@ const mostrarModalSubida = (imagenDataUrl) => {
 }
 
 // Funciones globales para los botones del modal
-window.cancelarSubidaModal = () => {
-  console.log('❌ Cancelando subida...')
+const quitarModalSubida = () => {
   const modal = document.getElementById('modal-subida')
   if (modal) {
+    focusTrap.unmounted(modal.firstElementChild)
     modal.remove()
   }
+}
+
+onBeforeUnmount(quitarModalSubida)
+
+window.cancelarSubidaModal = () => {
+  console.log('❌ Cancelando subida...')
+  quitarModalSubida()
   // Limpiar datos
   archivoSeleccionado.value = null
   previsualizacionImagen.value = ''
@@ -468,10 +484,7 @@ window.confirmarSubidaModal = async () => {
       })
       
       // Cerrar modal
-      const modal = document.getElementById('modal-subida')
-      if (modal) {
-        modal.remove()
-      }
+      quitarModalSubida()
       
       // Limpiar datos
       archivoSeleccionado.value = null

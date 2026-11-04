@@ -31,6 +31,21 @@ export const inicioDelDia = (valor = new Date()) => {
   return fecha
 }
 
+export const errorProximoServicio = (fechaServicio, proximoServicio) => {
+  if (!proximoServicio) return '' // Es válido no programar otro trabajo.
+  const inicio = inicioDelDia(fechaServicio)
+  const proximo = inicioDelDia(proximoServicio)
+  if (Number.isNaN(proximo.getTime())) return 'Ingresá una fecha válida para el próximo servicio.'
+  return proximo < inicio ? 'El próximo servicio no puede ser anterior a la fecha del trabajo realizado.' : ''
+}
+
+export const errorRangoReporte = (fechaInicio, fechaFin) => {
+  const inicio = inicioDelDia(fechaInicio)
+  const fin = inicioDelDia(fechaFin)
+  if (Number.isNaN(inicio.getTime()) || Number.isNaN(fin.getTime())) return 'Ingresá las fechas de inicio y fin del reporte.'
+  return inicio > fin ? 'La fecha de inicio no puede ser posterior a la fecha de fin.' : ''
+}
+
 export const diasHastaFecha = (valor, hoy = new Date()) => {
   const destino = parsearFechaLocal(valor)
   const origen = parsearFechaLocal(hoy)

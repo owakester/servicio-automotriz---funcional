@@ -91,10 +91,10 @@ const getNotificationClasses = (type) => {
 <style scoped>
 .notification-region {
   position: fixed;
-  top: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
-  width: calc(100% - 2rem);
+  bottom: 1rem;
+  left: 1rem;
+  /* Dejar libres la navegación superior y el acceso flotante de WhatsApp. */
+  width: calc(100% - 6.5rem);
   max-width: 32rem;
   z-index: 100;
   pointer-events: none;
@@ -104,7 +104,7 @@ const getNotificationClasses = (type) => {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  max-height: calc(100dvh - 2rem);
+  max-height: min(40dvh, 24rem);
   overflow-y: auto;
   padding: 0.25rem;
 }

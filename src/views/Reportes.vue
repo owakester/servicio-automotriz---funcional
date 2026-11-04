@@ -6,6 +6,8 @@
       <div v-if="hayDatos" class="flex flex-wrap gap-2">
         <button
           @click="exportarServicios(filtros.fechaInicio, filtros.fechaFin)"
+          :disabled="Boolean(errorPeriodo)"
+          :title="errorPeriodo || 'Exportar servicios del período seleccionado'"
           class="btn-secondary flex items-center"
         >
           <Download class="h-4 w-4 mr-2" />
@@ -39,6 +41,8 @@
             v-model="filtros.fechaInicio"
             id="report-start-date"
             type="date"
+            :aria-invalid="Boolean(errorPeriodo)"
+            :aria-describedby="errorPeriodo ? 'report-period-error' : undefined"
             class="input-field"
           />
         </div>
@@ -50,6 +54,8 @@
             v-model="filtros.fechaFin"
             id="report-end-date"
             type="date"
+            :aria-invalid="Boolean(errorPeriodo)"
+            :aria-describedby="errorPeriodo ? 'report-period-error' : undefined"
             class="input-field"
           />
         </div>
@@ -62,10 +68,11 @@
           </button>
         </div>
       </div>
+      <p v-if="errorPeriodo" id="report-period-error" role="alert" class="mt-3 text-sm font-medium text-red-700">{{ errorPeriodo }}</p>
     </BaseCard>
 
     <!-- Estadísticas del Período -->
-    <BaseCard title="Resumen del Período" v-if="hayDatos && datosPeriodo">
+    <BaseCard title="Resumen del Período" v-if="hayDatos && datosPeriodo && !errorPeriodo">
       <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div class="text-center">
           <div class="text-3xl font-bold text-primary-600">
@@ -96,7 +103,7 @@
 
     <!-- Ingresos por Tipo de Servicio -->
     <p v-if="hayDatos" class="text-sm text-gray-600">Los importes incluyen solo servicios completados. No representan cobros registrados. El listado anual de servicios incluye todos los estados.</p>
-    <BaseCard title="Trabajos realizados por Tipo de Servicio" v-if="hayDatos && datosPeriodo && datosPeriodo.cantidadServicios > 0">
+    <BaseCard title="Trabajos realizados por Tipo de Servicio" v-if="hayDatos && datosPeriodo && !errorPeriodo && datosPeriodo.cantidadServicios > 0">
       <div class="overflow-x-auto">
         <table class="table">
           <thead class="bg-gray-50">
@@ -232,7 +239,7 @@ import { BarChart3, Download } from 'lucide-vue-next'
 import BaseCard from '../components/BaseCard.vue'
 import { useReports } from '../composables/useReports'
 import { useAutoService } from '../composables/useAutoService'
-import { fechaParaInput, formatearFecha } from '../utils/dates'
+import { fechaParaInput, formatearFecha, errorRangoReporte } from '../utils/dates'
 import { formatearDniCuil } from '../utils/clientIdentity'
 
 const {
@@ -252,6 +259,7 @@ const filtros = ref({
 })
 
 const datosPeriodo = ref(null)
+const errorPeriodo = computed(() => errorRangoReporte(filtros.value.fechaInicio, filtros.value.fechaFin))
 const hayDatos = computed(() => clientes.value.length > 0 || vehiculos.value.length > 0 || servicios.value.length > 0)
 
 // Computed
@@ -274,9 +282,7 @@ const maxIngresos = computed(() => {
 
 // Funciones
 const aplicarFiltros = () => {
-  if (filtros.value.fechaInicio && filtros.value.fechaFin) {
-    datosPeriodo.value = getIngresosPorPeriodo(filtros.value.fechaInicio, filtros.value.fechaFin)
-  }
+  datosPeriodo.value = errorPeriodo.value ? null : getIngresosPorPeriodo(filtros.value.fechaInicio, filtros.value.fechaFin)
 }
 
 const inicializarFiltros = () => {

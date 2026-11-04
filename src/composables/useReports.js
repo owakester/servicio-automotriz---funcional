@@ -1,12 +1,15 @@
 import { useAutoService } from './useAutoService'
-import { formatearFecha, inicioDelDia, parsearFechaLocal } from '../utils/dates'
+import { formatearFecha, inicioDelDia, parsearFechaLocal, errorRangoReporte } from '../utils/dates'
 import { formatearDniCuil } from '../utils/clientIdentity'
+import { crearCSV } from '../utils/csv'
 
 export const useReports = () => {
   const { clientes, vehiculos, servicios, obtenerClientePorId, obtenerVehiculoPorId } = useAutoService()
 
   // Reporte de servicios por periodo
   const getServiciosPorPeriodo = (fechaInicio, fechaFin) => {
+    const errorRango = errorRangoReporte(fechaInicio, fechaFin)
+    if (errorRango) throw new Error(errorRango)
     const inicio = inicioDelDia(fechaInicio)
     const fin = inicioDelDia(fechaFin)
     fin.setDate(fin.getDate() + 1)
@@ -127,18 +130,8 @@ export const useReports = () => {
 
   // Exportar datos a CSV
   const exportarCSV = (datos, nombreArchivo, columnas) => {
-    const headers = Object.keys(columnas).join(',')
-    
-    const filas = datos.map(item => 
-      Object.keys(columnas).map(key => {
-        const valor = columnas[key](item)
-        return typeof valor === 'string' && valor.includes(',') 
-          ? `"${valor}"` 
-          : valor
-      }).join(',')
-    )
-
-    const csv = [headers, ...filas].join('\n')
+    const headers = Object.keys(columnas)
+    const csv = crearCSV(headers, datos.map(item => headers.map(key => columnas[key](item))))
     
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
@@ -151,6 +144,7 @@ export const useReports = () => {
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
+      URL.revokeObjectURL(url)
     }
   }
 

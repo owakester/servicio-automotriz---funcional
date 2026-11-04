@@ -320,7 +320,9 @@
     </div>
 
     <!-- Modal Formulario -->
-    <div v-if="servicioDetalle" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click.self="cerrarDetalle" @keydown.esc="cerrarDetalle">
+    <div v-if="servicioDetalle" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      @pointerdown.capture="fondoDetalle.iniciar" @pointerup.capture="fondoDetalle.terminar"
+      @pointercancel.capture="fondoDetalle.cancelar" @click.self="fondoDetalle.click" @keydown.esc="cerrarDetalle">
       <section ref="detalleDialogo" v-focus-trap class="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="service-detail-title" tabindex="-1">
         <div class="flex items-start justify-between gap-4 mb-4">
           <h2 id="service-detail-title" class="text-xl font-bold text-gray-900">Detalle del servicio</h2>
@@ -346,7 +348,10 @@
     <div
       v-if="mostrarFormulario"
       class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-      @click.self="cancelarFormulario"
+      @pointerdown.capture="fondoFormulario.iniciar"
+      @pointerup.capture="fondoFormulario.terminar"
+      @pointercancel.capture="fondoFormulario.cancelar"
+      @click.self="fondoFormulario.click"
       @keydown.esc="cancelarFormulario"
     >
       <div v-focus-trap class="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="service-form-title" tabindex="-1">
@@ -492,11 +497,15 @@
                 v-model="formulario.proximoServicio"
                 id="service-next-date"
                 type="date"
+                :min="formulario.fechaServicio || undefined"
+                :aria-invalid="Boolean(errorFechaServicio)"
+                :aria-describedby="errorFechaServicio ? 'service-next-date-error' : undefined"
                 class="input-field"
                 :class="{
                   'bg-blue-50 border-blue-300': formulario.tipoServicio === 'Mantenimiento general'
                 }"
               />
+              <p v-if="errorFechaServicio" id="service-next-date-error" role="alert" class="mt-1 text-sm text-red-700">{{ errorFechaServicio }}</p>
             </div>
           </div>
 
@@ -559,6 +568,7 @@
 </template>
 
 <script setup>
+import { crearCierreFondo } from '../utils/backdropDismiss'
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { 
@@ -579,7 +589,7 @@ import { useDebounce, useMemoize } from '../composables/useOptimization'
 import { useMemoryLeakPrevention } from '../composables/useMemoryLeakPrevention'
 import VirtualList from '../components/VirtualList.vue'
 import PaginationControls from '../components/PaginationControls.vue'
-import { fechaParaInput, formatearFecha, parsearFechaLocal, sumarAnos } from '../utils/dates'
+import { fechaParaInput, formatearFecha, parsearFechaLocal, sumarAnos, errorProximoServicio } from '../utils/dates'
 import { useFechaActual } from '../composables/useFechaActual'
 import ClienteIdentificacion from '../components/ClienteIdentificacion.vue'
 import ProximoServicio from '../components/ProximoServicio.vue'
@@ -622,6 +632,7 @@ const cerrarDetalle = () => {
   origenDetalle?.focus()
   origenDetalle = null
 }
+const fondoDetalle = crearCierreFondo(cerrarDetalle)
 const filtroVehiculo = ref('')
 const filtroCliente = ref('')
 const filtroEstado = ref('')
@@ -813,15 +824,18 @@ const editarServicio = (servicio) => {
     ...servicio,
     fechaServicio: fechaParaInput(servicio.fechaServicio),
     proximoServicio: servicio.proximoServicio ? fechaParaInput(servicio.proximoServicio) : '',
-    costo: servicio.costo || '',
-    kilometrajeActual: servicio.kilometrajeActual || '',
+    costo: servicio.costo ?? '',
+    kilometrajeActual: servicio.kilometrajeActual ?? '',
     vehiculoId: servicio.vehiculoId.toString(),
     clienteId: servicio.clienteId.toString()
   }
   mostrarFormulario.value = true
 }
 
+const errorFechaServicio = computed(() => errorProximoServicio(formulario.value.fechaServicio, formulario.value.proximoServicio))
+
 const guardarServicio = async () => {
+  if (errorFechaServicio.value) return
   const datosServicio = {
     ...formulario.value,
     vehiculoId: parseInt(formulario.value.vehiculoId),
@@ -843,6 +857,8 @@ const cancelarFormulario = () => {
   servicioEditando.value = null
   limpiarFormulario()
 }
+
+const fondoFormulario = crearCierreFondo(cancelarFormulario)
 
 const eliminarServicioConfirm = (servicioId) => {
   servicioAEliminar.value = servicioId

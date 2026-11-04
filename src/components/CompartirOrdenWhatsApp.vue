@@ -16,10 +16,9 @@
           <label for="share-order-message" class="block text-sm font-medium mb-1">Vista previa editable</label>
           <textarea id="share-order-message" v-model="mensaje" rows="10" class="input-field" aria-describedby="share-order-privacy" />
           <p class="text-xs mt-1 text-right" :class="mensaje.length > 4000 ? 'text-red-700' : 'text-gray-500'">{{ mensaje.length }} / 4000 caracteres</p>
-          <p id="share-order-privacy" class="text-xs text-gray-500 mt-1">No se incluyen automáticamente DNI/CUIL, notas internas, importes ni enlaces privados de Drive.</p>
+          <p id="share-order-privacy" class="text-xs text-gray-500 mt-1">Se incluyen el presupuesto estimado de la orden y el kilometraje registrado en la ficha del vehículo. Podés editar o quitar esos datos antes de compartir. No se incluyen automáticamente DNI/CUIL, notas internas ni enlaces privados de Drive.</p>
           <div class="flex flex-wrap gap-2 mt-2">
             <button v-if="orden.observaciones" type="button" class="btn-secondary text-sm" :disabled="notasAgregadas" @click="agregarNotas">Agregar observaciones</button>
-            <button v-if="Number(orden.costoEstimado) > 0" type="button" class="btn-secondary text-sm" :disabled="importeAgregado" @click="agregarImporte">Agregar presupuesto estimado</button>
           </div>
         </div>
         <p v-if="errorMensaje" class="text-red-700 font-medium" role="alert">{{ errorMensaje }}</p>
@@ -45,13 +44,11 @@ const mensaje = ref(mensajeOrdenWhatsApp(props.orden, brand.nombre))
 const errorMensaje = ref('')
 const chatPreparado = ref(false)
 const notasAgregadas = ref(false)
-const importeAgregado = ref(false)
 const telefonoInput = ref(null)
 let focoAnterior
 onMounted(() => { focoAnterior = document.activeElement; telefonoInput.value?.focus() })
 onBeforeUnmount(() => { if (focoAnterior?.isConnected) focoAnterior.focus() })
 const agregarNotas = () => { mensaje.value += `\n\nObservaciones:\n${props.orden.observaciones}`; notasAgregadas.value = true }
-const agregarImporte = () => { mensaje.value += `\n\nPresupuesto estimado (no es comprobante de pago): $${Number(props.orden.costoEstimado).toLocaleString('es-AR')}`; importeAgregado.value = true }
 const abrir = () => {
   errorMensaje.value = ''
   chatPreparado.value = false

@@ -3,6 +3,11 @@ import { formatearFecha } from '../utils/dates'
 import { formatearDniCuil } from '../utils/clientIdentity'
 import brand from '../assets/brand.json'
 
+// Los campos son texto del taller, no marcado HTML ejecutable.
+const textoHTML = valor => String(valor ?? '').replace(/[&<>"']/g, caracter => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+})[caracter])
+
 export const usePDF = () => {
   const { success, error } = useNotifications()
 
@@ -15,7 +20,7 @@ export const usePDF = () => {
         <html>
         <head>
           <meta charset="UTF-8">
-          <title>Orden de Mantenimiento ${orden.numeroOrden}</title>
+          <title>Orden de Mantenimiento ${textoHTML(orden.numeroOrden)}</title>
           <style>
             body { 
               font-family: Arial, sans-serif; 
@@ -146,7 +151,7 @@ export const usePDF = () => {
         <body>
           <div class="header">
             <img class="company-logo" src="${brand.logo}" alt="${brand.nombre}" width="180" height="84">
-            <div class="order-number">Orden de Mantenimiento: ${orden.numeroOrden}</div>
+            <div class="order-number">Orden de Mantenimiento: ${textoHTML(orden.numeroOrden)}</div>
             <div style="color: #6b7280; font-size: 14px;">
               Fecha: ${formatearFecha(orden.fechaCreacion)}
             </div>
@@ -157,7 +162,7 @@ export const usePDF = () => {
             <div class="info-grid">
               <div class="info-item">
                 <span class="info-label">Nombre:</span>
-                <span class="info-value">${orden.cliente?.nombre || 'No especificado'}</span>
+                <span class="info-value">${textoHTML(orden.cliente?.nombre || 'No especificado')}</span>
               </div>
               <div class="info-item">
                 <span class="info-label">DNI/CUIL:</span>
@@ -165,15 +170,15 @@ export const usePDF = () => {
               </div>
               <div class="info-item">
                 <span class="info-label">Teléfono:</span>
-                <span class="info-value">${orden.cliente?.telefono || 'No especificado'}</span>
+                <span class="info-value">${textoHTML(orden.cliente?.telefono || 'No especificado')}</span>
               </div>
               <div class="info-item">
                 <span class="info-label">Email:</span>
-                <span class="info-value">${orden.cliente?.email || 'No especificado'}</span>
+                <span class="info-value">${textoHTML(orden.cliente?.email || 'No especificado')}</span>
               </div>
               <div class="info-item">
                 <span class="info-label">Dirección:</span>
-                <span class="info-value">${orden.cliente?.direccion || 'No especificado'}</span>
+                <span class="info-value">${textoHTML(orden.cliente?.direccion || 'No especificado')}</span>
               </div>
             </div>
           </div>
@@ -183,23 +188,23 @@ export const usePDF = () => {
             <div class="info-grid">
               <div class="info-item">
                 <span class="info-label">Marca/Modelo:</span>
-                <span class="info-value">${orden.vehiculo?.marca || ''} ${orden.vehiculo?.modelo || ''}</span>
+                <span class="info-value">${textoHTML(orden.vehiculo?.marca)} ${textoHTML(orden.vehiculo?.modelo)}</span>
               </div>
               <div class="info-item">
                 <span class="info-label">Patente:</span>
-                <span class="info-value">${orden.vehiculo?.patente || 'No especificado'}</span>
+                <span class="info-value">${textoHTML(orden.vehiculo?.patente || 'No especificado')}</span>
               </div>
               <div class="info-item">
                 <span class="info-label">Año:</span>
-                <span class="info-value">${orden.vehiculo?.anio || 'No especificado'}</span>
+                <span class="info-value">${textoHTML(orden.vehiculo?.anio || 'No especificado')}</span>
               </div>
               <div class="info-item">
                 <span class="info-label">Color:</span>
-                <span class="info-value">${orden.vehiculo?.color || 'No especificado'}</span>
+                <span class="info-value">${textoHTML(orden.vehiculo?.color || 'No especificado')}</span>
               </div>
               <div class="info-item">
                 <span class="info-label">Kilometraje:</span>
-                <span class="info-value">${orden.vehiculo?.kilometraje?.toLocaleString() || 'No especificado'} km</span>
+                <span class="info-value">${textoHTML(orden.vehiculo?.kilometraje?.toLocaleString() ?? 'No especificado')} km</span>
               </div>
             </div>
           </div>
@@ -209,11 +214,11 @@ export const usePDF = () => {
             <div class="info-grid">
               <div class="info-item">
                 <span class="info-label">Estado:</span>
-                <span class="status status-${orden.estado}">${formatearEstado(orden.estado)}</span>
+                <span class="status status-${textoHTML(orden.estado)}">${formatearEstado(orden.estado)}</span>
               </div>
               <div class="info-item">
                 <span class="info-label">Prioridad:</span>
-                <span class="priority priority-${orden.prioridad}">${formatearPrioridad(orden.prioridad)}</span>
+                <span class="priority priority-${textoHTML(orden.prioridad)}">${formatearPrioridad(orden.prioridad)}</span>
               </div>
               <div class="info-item">
                 <span class="info-label">Fecha de Vencimiento:</span>
@@ -221,20 +226,20 @@ export const usePDF = () => {
               </div>
               <div class="info-item">
                 <span class="info-label">Costo Estimado:</span>
-                <span class="info-value">$${orden.costoEstimado?.toLocaleString() || 'No especificado'}</span>
+                <span class="info-value">$${textoHTML(orden.costoEstimado?.toLocaleString() ?? 'No especificado')}</span>
               </div>
             </div>
           </div>
 
           <div class="section">
             <div class="section-title">Trabajo a Realizar</div>
-            <div class="trabajo-detalle">${orden.descripcionTrabajo || 'No especificado'}</div>
+            <div class="trabajo-detalle">${textoHTML(orden.descripcionTrabajo || 'No especificado')}</div>
           </div>
 
           ${orden.observaciones ? `
           <div class="section">
             <div class="section-title">Observaciones</div>
-            <div class="trabajo-detalle">${orden.observaciones}</div>
+            <div class="trabajo-detalle">${textoHTML(orden.observaciones)}</div>
           </div>
           ` : ''}
 
@@ -272,7 +277,7 @@ export const usePDF = () => {
         URL.revokeObjectURL(url)
       }
 
-      success(`PDF de orden ${orden.numeroOrden} generado`)
+      success(`Orden ${orden.numeroOrden} lista para imprimir o guardar como PDF desde el navegador`)
       return contenidoHTML
 
     } catch (err) {

@@ -13,12 +13,24 @@ export const normalizarTelefonoWhatsApp = valor => {
   return /^[1-9]\d{7,14}$/.test(numero) ? numero : ''
 }
 
+const numeroRegistrado = valor => {
+  if (!['number', 'string'].includes(typeof valor) || String(valor).trim() === '') return null
+  const numero = Number(valor)
+  return Number.isFinite(numero) && numero >= 0 ? numero : null
+}
+
 export const mensajeOrdenWhatsApp = (orden, nombreTaller) => {
   const estado = { pendiente: 'Pendiente', en_proceso: 'En proceso', completada: 'Completada', cancelada: 'Cancelada' }[orden.estado] || orden.estado || 'Sin estado registrado'
+  const presupuesto = numeroRegistrado(orden.costoEstimado)
+  // La orden no almacena una lectura propia: usar la registrada en el vehículo,
+  // sin presentarla como kilometraje histórico al momento de crear la orden.
+  const kilometraje = numeroRegistrado(orden.vehiculo?.kilometraje)
   return [
     `Hola ${orden.cliente?.nombre || ''}. Te compartimos la orden ${orden.numeroOrden || orden.id} de ${nombreTaller}.`,
     `Vehículo: ${orden.vehiculo?.marca || ''} ${orden.vehiculo?.modelo || ''} — ${orden.vehiculo?.patente || ''}`,
+    `Kilometraje registrado del vehículo: ${kilometraje === null ? 'Sin registrar' : `${kilometraje.toLocaleString('es-AR')} km`}`,
     `Fecha de la orden: ${formatearFecha(orden.fechaCreacion)}\nEstado: ${estado}`,
+    `Presupuesto estimado (no es comprobante de pago): ${presupuesto === null ? 'Sin registrar' : `$${presupuesto.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}`,
     `Detalle del trabajo:\n${orden.descripcionTrabajo || 'Sin descripción registrada.'}`
   ].join('\n\n')
 }

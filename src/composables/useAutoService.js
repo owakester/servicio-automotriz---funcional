@@ -23,7 +23,7 @@ import {
   normalizarEmail,
   normalizarPatente
 } from '../utils/dataIntegrity'
-import { diasHastaFecha, estaFechaVencida, inicioDelDia, parsearFechaLocal } from '../utils/dates'
+import { diasHastaFecha, estaFechaVencida, inicioDelDia, parsearFechaLocal, errorProximoServicio } from '../utils/dates'
 import { useFechaActual } from './useFechaActual'
 import { esDniCuilValido, normalizarDniCuil } from '../utils/clientIdentity'
 
@@ -477,6 +477,12 @@ Escribínos para más info!`
   
   // Función para compartir fotos del trabajo
   const compartirFotos = (orden) => {
+    // No prometer fotos ni abrir WhatsApp cuando la orden no tiene ninguna.
+    const guardada = ordenes.value.find(o => idsIguales(o.id, orden.id))
+    if (!guardada?.imagenes?.length) {
+      error('Esta orden no tiene fotos. Agregá al menos una desde Editar orden antes de compartirlas.')
+      return null
+    }
     const cliente = obtenerClientePorId(orden.clienteId)
     const vehiculo = obtenerVehiculoPorId(orden.vehiculoId)
     
@@ -691,6 +697,8 @@ Todo perfecto! ✨
       error('Revisa el tipo, la fecha y el costo del servicio')
       return null
     }
+    const errorFecha = errorProximoServicio(servicio.fechaServicio, servicio.proximoServicio)
+    if (errorFecha) { error(errorFecha); return null }
     const nuevoServicio = {
       id: crearIdUnico(),
       ...servicio,
@@ -716,6 +724,8 @@ Todo perfecto! ✨
         error('Revisa el tipo, la fecha y el costo del servicio')
         return null
       }
+      const errorFecha = errorProximoServicio(servicioCombinado.fechaServicio, servicioCombinado.proximoServicio)
+      if (errorFecha) { error(errorFecha); return null }
       const actualizado = { ...servicioCombinado, fechaCreacion: servicios.value[index].fechaCreacion }
       return confirmarCambio('servicios', servicios.value.map((s, i) => i === index ? actualizado : s), actualizado, `Servicio ${servicioActualizado.tipoServicio} actualizado`)
     }

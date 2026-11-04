@@ -173,21 +173,39 @@ await check('un guardado rechazado conserva el formulario y el borrador', async 
   assert.equal(app.ordenes.value.length, 0)
   form.descartarFormulario()
 })
-const shared = { ...order, cliente: { ...client, email: 'privado@example.com' }, vehiculo: car, estado: 'completada', observaciones: 'Nota interna privada', costoEstimado: 12345, googleDriveLink: 'https://drive.google.com/privado' }
+const shared = { ...order, cliente: { ...client, email: 'privado@example.com' }, vehiculo: { ...car, kilometraje: 85400 }, estado: 'completada', observaciones: 'Nota interna privada', costoEstimado: 12345, googleDriveLink: 'https://drive.google.com/privado' }
 const original = JSON.stringify(shared)
 let preview = await view(mod.CompartirView, { orden: shared })
-await check('la vista previa incluye trabajo y vehículo pero no notas internas, DNI/CUIL, importes ni enlaces privados', () => {
+await check('la vista previa incluye trabajo, presupuesto y kilometraje pero no notas internas, DNI/CUIL ni enlaces privados', () => {
   assert.match(preview.mensaje.value, /Detalle ampliado/)
   assert.match(preview.mensaje.value, /QA123BC/)
-  assert.doesNotMatch(preview.mensaje.value, /Nota interna privada|12345678|12345|drive\.google|privado@example/)
+  assert.match(preview.mensaje.value, /Presupuesto estimado \(no es comprobante de pago\): \$12\.345,00/)
+  assert.match(preview.mensaje.value, /Kilometraje registrado del vehículo: 85\.400 km/)
+  assert.equal(preview.mensaje.value.match(/Presupuesto estimado/g).length, 1)
+  assert.doesNotMatch(preview.mensaje.value, /Nota interna privada|12345678|drive\.google|privado@example/)
   assert.equal(opened.length, 0)
 })
-await check('el operador puede editar el mensaje e incluir observaciones e importe explícitamente', () => {
+await check('cero es válido y datos faltantes o inválidos no se presentan como ceros inventados', () => {
+  const mensaje = orden => mod.mensajeOrdenWhatsApp(orden, 'Taller QA')
+  for (const cero of [0, '0']) {
+    const text = mensaje({ ...shared, costoEstimado: cero, vehiculo: { ...car, kilometraje: cero } })
+    assert.match(text, /Presupuesto estimado \(no es comprobante de pago\): \$0,00/)
+    assert.match(text, /Kilometraje registrado del vehículo: 0 km/)
+  }
+  for (const ausente of [undefined, null, '', ' ', 'inválido', -1, Infinity, NaN]) {
+    const text = mensaje({ ...shared, costoEstimado: ausente, vehiculo: { ...car, kilometraje: ausente } })
+    assert.match(text, /Presupuesto estimado \(no es comprobante de pago\): Sin registrar/)
+    assert.match(text, /Kilometraje registrado del vehículo: Sin registrar/)
+    assert.doesNotMatch(text, /NaN|Infinity|undefined|\$0/)
+  }
+  assert.match(mensaje({ ...shared, costoEstimado: '1500.50' }), /\$1\.500,50/)
+})
+await check('el operador puede editar o quitar el presupuesto y kilometraje y agregar notas sin modificar registros', () => {
   preview.mensaje.value = 'Texto revisado por el taller'
-  preview.agregarNotas(); preview.agregarImporte()
+  preview.agregarNotas()
   assert.match(preview.mensaje.value, /^Texto revisado por el taller/)
   assert.match(preview.mensaje.value, /Nota interna privada/)
-  assert.match(preview.mensaje.value, /Presupuesto estimado \(no es comprobante de pago\)/)
+  assert.doesNotMatch(preview.mensaje.value, /Presupuesto estimado|Kilometraje registrado/)
   assert.equal(JSON.stringify(shared), original)
 })
 await check('teléfono o mensaje inválidos muestran el error sin abrir WhatsApp', () => {
@@ -203,7 +221,7 @@ await check('teléfono o mensaje inválidos muestran el error sin abrir WhatsApp
   assert.equal(opened.length, 0)
 })
 await check('solo el clic explícito prepara el chat con el texto exacto, sin enviar ni modificar la orden', () => {
-  preview.mensaje.value = 'Trabajo revisado: aceite & filtros\nObservación: ¿todo bien? 🔧'
+  preview.mensaje.value = `${mod.mensajeOrdenWhatsApp(shared, 'Taller QA')}\nTrabajo revisado: aceite & filtros\nObservación: ¿todo bien? 🔧`
   preview.telefono.value = '11 5555-1234'
   preview.abrir()
   assert.equal(opened.length, 1)
@@ -211,6 +229,8 @@ await check('solo el clic explícito prepara el chat con el texto exacto, sin en
   assert.equal(url.origin, 'https://wa.me')
   assert.equal(url.pathname, '/5491155551234')
   assert.equal(url.searchParams.get('text'), preview.mensaje.value)
+  assert.match(url.searchParams.get('text'), /\$12\.345,00/)
+  assert.match(url.searchParams.get('text'), /85\.400 km/)
   assert.equal(opened[0][2], 'noopener,noreferrer')
   assert.equal(JSON.stringify(shared), original)
   assert.equal(preview.chatPreparado.value, true)

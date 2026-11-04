@@ -181,16 +181,17 @@
                     v-if="orden.estado === 'completada'"
                     @click="compartirFotosWhatsApp(orden)"
                     class="p-2 text-blue-600 hover:text-blue-800 transition-colors"
-                  title="Compartir fotos del trabajo"
+                  :title="obtenerImagenesDeOrden(orden.id).length ? 'Compartir fotos del trabajo (adjuntarlas manualmente en WhatsApp)' : 'Esta orden no tiene fotos; agregalas desde Editar orden'"
                   :aria-label="`Compartir fotos de la orden ${orden.numeroOrden}`"
                   >
                     <Share2 class="h-4 w-4" aria-hidden="true" />
+                    <span v-if="!obtenerImagenesDeOrden(orden.id).length" class="text-xs">Sin fotos</span>
                   </button>
                   <button
                     @click="generarYSubirPDF(orden)"
                     class="p-2 text-blue-600 hover:text-blue-800 transition-colors"
-                  title="Generar PDF y subir a Google Drive"
-                  :aria-label="`Generar PDF de la orden ${orden.numeroOrden}`"
+                  title="Imprimir o guardar PDF (en Drive se guarda una copia HTML)"
+                  :aria-label="`Imprimir o guardar como PDF la orden ${orden.numeroOrden}`"
                   >
                     <FileText class="h-4 w-4" aria-hidden="true" />
                   </button>
@@ -240,10 +241,13 @@
     <div
       v-if="mostrarFormulario"
       class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-      @click.self="cancelarFormulario"
+      @pointerdown.capture="fondoFormulario.iniciar"
+      @pointerup.capture="fondoFormulario.terminar"
+      @pointercancel.capture="fondoFormulario.cancelar"
+      @click.self="fondoFormulario.click"
       @keydown.esc="cancelarFormulario"
     >
-      <div v-focus-trap class="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="order-form-title" tabindex="-1">
+      <div v-focus-trap class="order-dialog bg-white rounded-lg p-4 sm:p-6 min-w-0 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="order-form-title" tabindex="-1">
         <h2 id="order-form-title" class="text-xl font-bold text-gray-900 mb-4">
           {{ ordenBorradorId != null ? 'Editar Orden' : 'Nueva Orden de Mantenimiento' }}
         </h2>
@@ -444,6 +448,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { crearCierreFondo } from '../utils/backdropDismiss'
 import { useRouter } from 'vue-router'
 import { 
   Plus, 
@@ -687,6 +692,7 @@ const descartarFormulario = () => {
   mostrarFormulario.value = false
   limpiarFormulario()
 }
+const fondoFormulario = crearCierreFondo(cancelarFormulario)
 onBeforeUnmount(() => { if (mostrarFormulario.value) cancelarFormulario() })
 
 const eliminarOrdenConfirm = (ordenId) => {
@@ -792,8 +798,6 @@ const generarYSubirPDF = async (orden) => {
             googleDriveLink: resultado.webViewLink
           })
         }
-      } else {
-        success(`PDF de orden ${orden.numeroOrden} generado correctamente`)
       }
     }
   } catch (err) {
@@ -882,3 +886,11 @@ onMounted(async () => {
   }
 })
 </script>
+
+<style scoped>
+.order-dialog .input-field,
+.order-dialog .grid > div {
+  min-width: 0;
+  max-width: 100%;
+}
+</style>

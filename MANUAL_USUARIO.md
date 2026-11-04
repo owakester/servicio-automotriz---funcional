@@ -60,8 +60,8 @@ La orden representa el trabajo pendiente o en curso.
 ### Compartir el trabajo por WhatsApp
 
 1. Guardá la orden y presioná **WhatsApp** en su fila (disponible en todos los estados).
-2. Revisá el teléfono y la vista previa editable. Corregir el destinatario allí no modifica la ficha del cliente.
-3. Si corresponde, elegí **Agregar observaciones** o **Agregar presupuesto estimado**. Revisá que no incluyan notas internas; el presupuesto no es un comprobante de pago.
+2. Revisá el teléfono y la vista previa editable: incluye automáticamente el **presupuesto estimado de la orden guardada** y el **kilometraje registrado en la ficha del vehículo**. Si un dato falta, aparece «Sin registrar». Podés editar o quitar esas líneas; esto no modifica la orden ni el vehículo. Corregir el destinatario allí tampoco modifica la ficha del cliente.
+3. Si corresponde, elegí **Agregar observaciones**. Revisá que no incluyan notas internas; el presupuesto no es un comprobante de pago. El kilometraje es el de la ficha del vehículo al abrir la vista previa, no una lectura histórica guardada con la orden.
 4. Presioná **Abrir WhatsApp** y confirmá el envío dentro de WhatsApp. El programa no envía mensajes automáticamente y no adjunta un PDF. Para compartir un PDF, generá el documento y adjuntalo manualmente en el chat.
 
 El botón de PDF abre un documento para imprimir. Para guardarlo como PDF, usá **Imprimir → Guardar como PDF** en el navegador. Si bloquea la ventana, se descarga el documento HTML para abrirlo e imprimirlo.
