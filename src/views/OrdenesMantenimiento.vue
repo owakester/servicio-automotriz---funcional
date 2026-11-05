@@ -260,13 +260,26 @@
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label for="order-client-search" class="block text-sm font-medium text-gray-700 mb-1">Buscar cliente</label>
-              <input id="order-client-search" v-model="busquedaCliente" type="search" class="input-field mb-2" placeholder="Nombre o DNI/CUIL" />
+              <input id="order-client-search" ref="busquedaClienteInput" v-model="busquedaCliente" type="search" class="input-field" placeholder="Nombre o DNI/CUIL" autocomplete="off"
+                aria-describedby="order-client-search-help order-client-search-status"
+                :aria-controls="busquedaCliente.trim() && clientesCoincidentes.length ? 'order-client-results' : undefined"
+                @keydown.down.prevent="enfocarResultadoCliente(0)" @keydown.enter.prevent="elegirDesdeBusqueda" @keydown.esc="cerrarBusquedaCliente" />
+              <p id="order-client-search-help" class="mt-1 text-xs text-gray-600">Escribí un nombre o DNI/CUIL y elegí una coincidencia. También podés usar el selector Cliente.</p>
+              <p id="order-client-search-status" role="status" class="mt-1 text-sm text-gray-600">{{ busquedaCliente.trim() ? (clientesCoincidentes.length ? `${clientesCoincidentes.length} coincidencia${clientesCoincidentes.length === 1 ? '' : 's'}. Elegí el cliente para ver sus vehículos.` : 'No se encontraron clientes.') : '' }}</p>
+              <ul v-if="busquedaCliente.trim() && clientesCoincidentes.length" id="order-client-results" ref="resultadosClientes" aria-label="Clientes encontrados" class="my-2 max-h-48 overflow-y-auto rounded-lg border border-gray-300 divide-y divide-gray-200">
+                <li v-for="(cliente, indice) in clientesCoincidentes" :key="cliente.id">
+                  <button type="button" class="w-full px-3 py-2 text-left text-sm whitespace-normal break-words hover:bg-blue-50 focus:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500"
+                    :aria-label="`Seleccionar ${etiquetaCliente(cliente)}`" @click="seleccionarClienteEncontrado(cliente)"
+                    @keydown.down.prevent="enfocarResultadoCliente(indice + 1)" @keydown.up.prevent="enfocarResultadoCliente(indice - 1)" @keydown.esc="cerrarBusquedaCliente">
+                    {{ etiquetaCliente(cliente) }}
+                  </button>
+                </li>
+              </ul>
               <label for="order-client" class="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
               <select id="order-client" v-model="formulario.clienteId" @change="onClienteChange" class="input-field">
                 <option value="">Todos los clientes / elegir por vehículo</option>
                 <option v-for="cliente in clientesDisponibles" :key="cliente.id" :value="cliente.id">{{ etiquetaCliente(cliente) }}</option>
               </select>
-              <p v-if="busquedaCliente.trim() && clientesDisponibles.length === 0" class="mt-1 text-sm text-gray-500">No se encontraron clientes.</p>
             </div>
             <div>
               <label for="order-vehicle" class="block text-sm font-medium text-gray-700 mb-1">
@@ -275,6 +288,7 @@
               <select
                 v-model="formulario.vehiculoId"
                 id="order-vehicle"
+                ref="vehiculoInput"
                 autofocus
                 @change="onVehiculoChange"
                 required
@@ -447,7 +461,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { crearCierreFondo } from '../utils/backdropDismiss'
 import { useRouter } from 'vue-router'
 import { 
@@ -516,6 +530,9 @@ const filtroEstado = ref('')
 const filtroPrioridad = ref('')
 const filtroVehiculo = ref('')
 const busquedaCliente = ref('')
+const busquedaClienteInput = ref(null)
+const resultadosClientes = ref(null)
+const vehiculoInput = ref(null)
 const mostrarConfirmacion = ref(false)
 const googleDriveEnabled = ref(true)
 const isConnecting = ref(false)
@@ -570,23 +587,54 @@ const hayFiltros = computed(() =>
   filtroTexto.value || filtroEstado.value || filtroPrioridad.value || filtroVehiculo.value
 )
 
-const clientesDisponibles = computed(() => {
-  const texto = busquedaCliente.value.trim().toLocaleLowerCase('es')
+const normalizarBusquedaCliente = valor => String(valor || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es').trim().replace(/\s+/g, ' ')
+const clientesCoincidentes = computed(() => {
+  const texto = normalizarBusquedaCliente(busquedaCliente.value)
   return clientes.value.filter(cliente =>
-    String(cliente.id) === String(formulario.value.clienteId) || !texto ||
-    cliente.nombre?.toLocaleLowerCase('es').includes(texto) || coincideDniCuil(cliente.dniCuil, texto)
+    !texto || normalizarBusquedaCliente(cliente.nombre).includes(texto) || coincideDniCuil(cliente.dniCuil, texto)
   )
+})
+const clientesDisponibles = computed(() => {
+  const seleccionado = clientes.value.find(cliente => String(cliente.id) === String(formulario.value.clienteId))
+  // Mantener la etiqueta del cliente seleccionado sin mostrarlo como una falsa
+  // coincidencia cuando el operador busca a otra persona.
+  return seleccionado && !clientesCoincidentes.value.some(cliente => cliente.id === seleccionado.id)
+    ? [seleccionado, ...clientesCoincidentes.value] : clientesCoincidentes.value
 })
 const vehiculosDisponibles = computed(() => vehiculos.value.filter(vehiculo =>
   !formulario.value.clienteId || String(vehiculo.clienteId) === String(formulario.value.clienteId)
 ))
 const onClienteChange = () => {
+  busquedaCliente.value = ''
   servicioOrigenId.value = ''
   const disponibles = vehiculosDisponibles.value
   if (!disponibles.some(vehiculo => String(vehiculo.id) === String(formulario.value.vehiculoId))) {
     formulario.value.vehiculoId = ''
   }
   if (formulario.value.clienteId && disponibles.length === 1) formulario.value.vehiculoId = disponibles[0].id
+}
+
+const seleccionarClienteEncontrado = async cliente => {
+  formulario.value.clienteId = cliente.id
+  onClienteChange()
+  await nextTick()
+  vehiculoInput.value?.focus()
+}
+const enfocarResultadoCliente = indice => {
+  const botones = resultadosClientes.value?.querySelectorAll('button')
+  if (botones?.length) botones[(indice + botones.length) % botones.length].focus()
+}
+const elegirDesdeBusqueda = () => {
+  if (!busquedaCliente.value.trim()) return
+  if (clientesCoincidentes.value.length === 1) return seleccionarClienteEncontrado(clientesCoincidentes.value[0])
+  enfocarResultadoCliente(0) // Con homónimos se requiere una elección explícita.
+}
+const cerrarBusquedaCliente = evento => {
+  if (!busquedaCliente.value.trim()) return
+  evento.preventDefault()
+  evento.stopPropagation()
+  busquedaCliente.value = ''
+  busquedaClienteInput.value?.focus()
 }
 
 // Funciones
@@ -617,6 +665,7 @@ const limpiarFormulario = () => {
 }
 
 const onVehiculoChange = () => {
+  busquedaCliente.value = ''
   servicioOrigenId.value = ''
   if (formulario.value.vehiculoId) {
     const vehiculo = obtenerVehiculoPorId(parseInt(formulario.value.vehiculoId))

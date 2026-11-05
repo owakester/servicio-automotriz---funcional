@@ -43,7 +43,7 @@ El cliente se elige al crear el vehículo y después queda fijo. Al editar podé
 ## Crear y actualizar una orden
 
 1. Entrá en **Órdenes** y presioná **Nueva Orden**.
-2. Elegí el vehículo. El cliente se completa automáticamente.
+2. Podés **Buscar cliente** por nombre o DNI/CUIL: las coincidencias aparecen debajo del campo, aunque escribas sin tildes. Elegí una con clic o con flechas y Enter. Si tiene un solo vehículo se selecciona automáticamente; si tiene varios, elegí el correspondiente. También podés elegir directamente el vehículo y el cliente se completa automáticamente.
 3. Describí el trabajo solicitado.
 4. Indicá prioridad, presupuesto y fecha de vencimiento si corresponde.
 5. Actualizá el estado a medida que avanza el trabajo.
